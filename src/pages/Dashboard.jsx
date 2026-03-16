@@ -242,7 +242,7 @@ export default function Dashboard({ userId }) {
   const [periodError, setPeriodError] = useState('')
   const [existingPeriodLogId, setExistingPeriodLogId] = useState(null)
   const [periodForm, setPeriodForm] = useState({
-    startDate: getTodayDate(),
+    startDate: todayISO(),
     endDate: '',
     flowIntensity: '',
     notes: '',
@@ -503,7 +503,7 @@ export default function Dashboard({ userId }) {
   }
 
   async function openPeriodModal() {
-    const today = getTodayDate()
+    const today = todayISO()
     setPeriodError('')
     setPeriodModalOpen(true)
 

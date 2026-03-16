@@ -121,7 +121,7 @@ function dedupeLogsByDate(logs) {
 export default function Symptoms() {
   const [profileId, setProfileId] = useState(null)
   const [profileAge, setProfileAge] = useState(null)
-  const [selectedDate, setSelectedDate] = useState(getTodayDate())
+  const [selectedDate, setSelectedDate] = useState(todayISO())
   const [selectedSymptoms, setSelectedSymptoms] = useState([])
   const [severity, setSeverity] = useState(5)
   const [notes, setNotes] = useState('')

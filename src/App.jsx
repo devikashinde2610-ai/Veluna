@@ -341,76 +341,101 @@ function App() {
 
   useEffect(() => {
     let mounted = true
+    const timeout = setTimeout(() => {
+      if (mounted) {
+        setSession(null)
+        setHasProfile(null)
+        setProfileLoading(false)
+        setAuthLoading(false)
+      }
+    }, 3000)
+
+    const clearLoadingTimeout = () => clearTimeout(timeout)
+
+    async function resolveSessionAndProfile(nextSession = null) {
+      console.log('Checking session...')
+
+      try {
+        const activeSession =
+          nextSession ?? (await supabase.auth.getSession()).data.session ?? null
+
+        if (!mounted) {
+          return
+        }
+
+        console.log('Session found:', activeSession?.user?.email)
+
+        if (!activeSession) {
+          console.log('Redirecting to:', '/login')
+          setSession(null)
+          setHasProfile(null)
+          setProfileLoading(false)
+          setAuthLoading(false)
+          clearLoadingTimeout()
+          return
+        }
+
+        setSession(activeSession)
+        setProfileLoading(true)
+
+        const { data, error } = await supabase
+          .from('profiles')
+          .select('id, full_name')
+          .eq('id', activeSession.user.id)
+          .maybeSingle()
+
+        if (!mounted) {
+          return
+        }
+
+        console.log('Profile check result:', data)
+
+        const hasCompletedProfile =
+          !error && Boolean(data?.id) && typeof data?.full_name === 'string' && data.full_name.trim() !== ''
+
+        console.log('Redirecting to:', hasCompletedProfile ? '/' : '/onboarding')
+
+        setHasProfile(hasCompletedProfile)
+        setProfileLoading(false)
+        setAuthLoading(false)
+        clearLoadingTimeout()
+      } catch (error) {
+        if (!mounted) {
+          return
+        }
+
+        console.error('Auth bootstrap failed:', error)
+        console.log('Redirecting to:', '/login')
+        setSession(null)
+        setHasProfile(null)
+        setProfileLoading(false)
+        setAuthLoading(false)
+        clearLoadingTimeout()
+      }
+    }
 
     const {
       data: { subscription },
-    } = supabase.auth.onAuthStateChange((_event, nextSession) => {
+    } = supabase.auth.onAuthStateChange((event, nextSession) => {
       if (!mounted) {
         return
       }
 
-      setSession(nextSession ?? null)
-      setAuthLoading(false)
+      if (event === 'SIGNED_IN') {
+        console.log('SIGNED_IN event received after auth redirect')
+      }
+
+      void resolveSessionAndProfile(nextSession ?? null)
     })
 
-    async function loadSession() {
-      const { data } = await supabase.auth.getSession()
-      if (mounted) {
-        setSession(data.session ?? null)
-        setAuthLoading(false)
-      }
-    }
-
-    loadSession()
+    void resolveSessionAndProfile()
 
     return () => {
       mounted = false
+      clearLoadingTimeout()
       subscription.unsubscribe()
     }
   }, [])
-
-  useEffect(() => {
-    let active = true
-
-    async function loadProfileStatus() {
-      const {
-        data: { user },
-        error: userError,
-      } = await supabase.auth.getUser()
-
-      const authUserId = user?.id ?? session?.user?.id ?? null
-
-      if (userError || !authUserId) {
-        setHasProfile(null)
-        setProfileLoading(false)
-        return
-      }
-
-      setProfileLoading(true)
-
-      const { data, error } = await supabase
-        .from('profiles')
-        .select('id, full_name')
-        .eq('id', authUserId)
-        .maybeSingle()
-
-      if (!active) {
-        return
-      }
-
-      const hasCompletedProfile =
-        !error && Boolean(data?.id) && typeof data?.full_name === 'string' && data.full_name.trim() !== ''
-
-      setHasProfile(hasCompletedProfile)
-      setProfileLoading(false)
-    }
-
-    loadProfileStatus()
-
-    return () => {
-      active = false
-    }
-  }, [session?.user?.id])
 
   if (authLoading || (session && profileLoading)) {
     return (
