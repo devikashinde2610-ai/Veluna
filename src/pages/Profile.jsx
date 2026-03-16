@@ -1,7 +1,8 @@
 import { useEffect, useMemo, useState } from 'react'
 import { User } from 'lucide-react'
+import CustomDatePicker from '../components/CustomDatePicker.jsx'
 import supabase from '../lib/supabase.js'
-import { formatDisplayDate, isValidDate, minDateISO, todayISO } from '../utils/dateUtils.js'
+import { isValidDate, todayISO } from '../utils/dateUtils.js'
 
 const bloodGroupOptions = ['A+', 'A-', 'B+', 'B-', 'O+', 'O-', 'AB+', 'AB-']
 const familyHistoryOptions = ['yes', 'no', 'not sure']
@@ -150,8 +151,7 @@ export default function Profile() {
     setSaving(false)
   }
 
-  const handleDateOfBirthChange = (event) => {
-    const nextValue = event.target.value
+  const handleDateOfBirthChange = (nextValue) => {
     setDateOfBirth(nextValue && isValidDate(nextValue) ? nextValue : '')
   }
 
@@ -207,18 +207,12 @@ export default function Profile() {
                 <span>Age</span>
                 <input type="number" min="1" value={age} onChange={(event) => setAge(event.target.value)} />
               </label>
-              <label className="field">
-                <span>Date of Birth</span>
-                <input
-                  type="date"
-                  value={dateOfBirth}
-                  min={minDateISO()}
-                  max={todayDate}
-                  lang="en-GB"
-                  title={formatDisplayDate(dateOfBirth) || 'dd/mm/yyyy'}
-                  onChange={handleDateOfBirthChange}
-                />
-              </label>
+              <CustomDatePicker
+                label="Date of Birth"
+                value={dateOfBirth}
+                maxYear={Number(todayDate.slice(0, 4))}
+                onChange={handleDateOfBirthChange}
+              />
               <label className="field">
                 <span>Height in cm</span>
                 <input

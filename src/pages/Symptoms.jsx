@@ -1,8 +1,9 @@
 import { useEffect, useMemo, useState } from 'react'
 import { HeartPulse, Lock } from 'lucide-react'
+import CustomDatePicker from '../components/CustomDatePicker.jsx'
 import supabase from '../lib/supabase.js'
 import { updateStreak } from '../lib/streak.js'
-import { formatDisplayDate, isValidDate, minDateISO, todayISO } from '../utils/dateUtils.js'
+import { formatDisplayDate, isValidDate, todayISO } from '../utils/dateUtils.js'
 
 const symptomOptions = [
   'Acne',
@@ -321,8 +322,7 @@ export default function Symptoms() {
     setTimeout(() => setMoodAnimating(null), 400)
   }
 
-  const handleSelectedDateChange = (event) => {
-    const nextValue = event.target.value
+  const handleSelectedDateChange = (nextValue) => {
     setSelectedDate(nextValue && isValidDate(nextValue) ? nextValue : '')
   }
 
@@ -410,18 +410,12 @@ export default function Symptoms() {
       ) : null}
 
       <section className="card symptoms-date-card">
-        <label className="field">
-          <span>Log for date</span>
-          <input
-            type="date"
-            value={selectedDate}
-            min={minDateISO()}
-            onChange={handleSelectedDateChange}
-            max={todayDate}
-            lang="en-GB"
-            title={formatDisplayDate(selectedDate) || 'dd/mm/yyyy'}
-          />
-        </label>
+        <CustomDatePicker
+          label="Log for date"
+          value={selectedDate}
+          maxYear={Number(todayDate.slice(0, 4))}
+          onChange={handleSelectedDateChange}
+        />
         {selectedDate !== todayDate && datesWithExistingEntries.has(selectedDate) ? (
           <p className="entry-date-note">
             <Lock size={14} />

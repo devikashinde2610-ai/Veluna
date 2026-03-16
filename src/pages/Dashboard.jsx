@@ -1,8 +1,9 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
-import { ChevronLeft, ChevronRight, Droplets, Flame, Leaf, Moon, Plus, Sparkles, Sprout, SunMedium, X } from 'lucide-react'
+import { ChevronLeft, ChevronRight, Droplets, Flame, Leaf, Moon, Sparkles, Sprout, SunMedium, X } from 'lucide-react'
+import CustomDatePicker from '../components/CustomDatePicker.jsx'
 import supabase from '../lib/supabase.js'
 import { fetchStreak, getStreakBadge } from '../lib/streak.js'
-import { formatDisplayDate, isValidDate, minDateISO, todayISO } from '../utils/dateUtils.js'
+import { formatDisplayDate, isValidDate, todayISO } from '../utils/dateUtils.js'
 
 const DAY_IN_MS = 1000 * 60 * 60 * 24
 const WEEKDAY_LABELS = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat']
@@ -909,11 +910,6 @@ export default function Dashboard({ userId }) {
         </div>
       </section>
 
-      <button type="button" className="dashboard-log-period-fab" onClick={openPeriodModal}>
-        <Plus size={18} strokeWidth={2.3} />
-        <span>Log Period</span>
-      </button>
-
       {periodModalOpen ? (
         <div className="phase-modal-backdrop" onClick={closePeriodModal}>
           <div
@@ -945,32 +941,19 @@ export default function Dashboard({ userId }) {
             ) : null}
 
             <form className="quick-log-form" onSubmit={handlePeriodSave}>
-              <div className="field-grid">
-                <label className="field">
-                  <span>Period Start Date</span>
-                  <input
-                    type="date"
-                    value={periodForm.startDate}
-                    min={minDateISO()}
-                    max={todayDate}
-                    lang="en-GB"
-                    title={formatDisplayDate(periodForm.startDate) || 'dd/mm/yyyy'}
-                    onChange={(event) => updatePeriodDateField('startDate', event.target.value)}
-                    required
-                  />
-                </label>
-                <label className="field">
-                  <span>Period End Date</span>
-                  <input
-                    type="date"
-                    value={periodForm.endDate}
-                    min={minDateISO()}
-                    max={todayDate}
-                    lang="en-GB"
-                    title={formatDisplayDate(periodForm.endDate) || 'dd/mm/yyyy'}
-                    onChange={(event) => updatePeriodDateField('endDate', event.target.value)}
-                  />
-                </label>
+              <div className="custom-date-picker-stack">
+                <CustomDatePicker
+                  label="Period Start Date"
+                  value={periodForm.startDate}
+                  maxYear={Number(todayDate.slice(0, 4))}
+                  onChange={(value) => updatePeriodDateField('startDate', value)}
+                />
+                <CustomDatePicker
+                  label="Period End Date"
+                  value={periodForm.endDate}
+                  maxYear={Number(todayDate.slice(0, 4))}
+                  onChange={(value) => updatePeriodDateField('endDate', value)}
+                />
               </div>
 
               <div className="quick-log-section">

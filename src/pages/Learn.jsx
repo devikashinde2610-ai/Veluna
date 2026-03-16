@@ -362,7 +362,9 @@ export default function Learn() {
               <div className="teen-tip-list">
                 {TEEN_DOS.map((tip) => (
                   <div key={tip} className="teen-tip-item">
-                    <span className="teen-tip-mark" aria-hidden="true"></span>
+                    <span className="teen-tip-mark" aria-hidden="true">
+                      {'\u2713'}
+                    </span>
                     <p>{tip}</p>
                   </div>
                 ))}
@@ -375,7 +377,9 @@ export default function Learn() {
               <div className="teen-tip-list">
                 {TEEN_DONTS.map((tip) => (
                   <div key={tip} className="teen-tip-item">
-                    <span className="teen-tip-mark" aria-hidden="true"></span>
+                    <span className="teen-tip-mark" aria-hidden="true">
+                      X
+                    </span>
                     <p>{tip}</p>
                   </div>
                 ))}

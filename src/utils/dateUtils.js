@@ -1,13 +1,18 @@
-// Format date to dd/mm/yyyy for display
-export const formatDisplayDate = (dateStr) => {
+// Format saved ISO-style dates to dd/mm/yyyy for display only.
+export const formatDate = (dateStr) => {
   if (!dateStr) return ''
-  const d = new Date(dateStr)
-  if (Number.isNaN(d.getTime())) return ''
-  const day = String(d.getDate()).padStart(2, '0')
-  const month = String(d.getMonth() + 1).padStart(2, '0')
-  const year = d.getFullYear()
+
+  const normalized = String(dateStr).split('T')[0]
+  const [year, month, day] = normalized.split('-')
+
+  if (!year || !month || !day) {
+    return ''
+  }
+
   return `${day}/${month}/${year}`
 }
+
+export const formatDisplayDate = formatDate
 
 // Get today's date in yyyy-mm-dd for input max
 export const todayISO = () => new Date().toISOString().split('T')[0]

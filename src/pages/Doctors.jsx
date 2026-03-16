@@ -3,8 +3,9 @@ import { MapPin, PhoneCall, Star, Video } from 'lucide-react'
 import { MapContainer, Marker, Popup, TileLayer } from 'react-leaflet'
 import L from 'leaflet'
 import 'leaflet/dist/leaflet.css'
+import CustomDatePicker from '../components/CustomDatePicker.jsx'
 import supabase from '../lib/supabase.js'
-import { formatDisplayDate, isValidDate, minDateISO, todayISO } from '../utils/dateUtils.js'
+import { formatDisplayDate, isValidDate, todayISO } from '../utils/dateUtils.js'
 
 const DEFAULT_LOCATION = {
   lat: 28.6139,
@@ -222,8 +223,7 @@ export default function Doctors() {
   const [videoStream, setVideoStream] = useState(null)
   const videoRef = useRef(null)
 
-  const handleAppointmentDateChange = (event) => {
-    const nextValue = event.target.value
+  const handleAppointmentDateChange = (nextValue) => {
     setAppointmentDate(nextValue && isValidDate(nextValue) ? nextValue : '')
   }
 
@@ -656,18 +656,12 @@ export default function Doctors() {
             <p className="muted">{activeBooking.address}</p>
 
             <div className="doctors-booking-form">
-              <label className="field">
-                <span>Date</span>
-                <input
-                  type="date"
-                  value={appointmentDate}
-                  min={minDateISO()}
-                  max={todayDate}
-                  lang="en-GB"
-                  title={formatDisplayDate(appointmentDate) || 'dd/mm/yyyy'}
-                  onChange={handleAppointmentDateChange}
-                />
-              </label>
+              <CustomDatePicker
+                label="Date"
+                value={appointmentDate}
+                maxYear={Number(todayDate.slice(0, 4))}
+                onChange={handleAppointmentDateChange}
+              />
 
               <div className="field">
                 <span>Time</span>

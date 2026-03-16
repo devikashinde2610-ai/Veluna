@@ -3,6 +3,11 @@
   padding: 24px;
 }
 
+.teen-dos-card .teen-tip-mark::before,
+.teen-donts-card .teen-tip-mark::before {
+  content: none !important;
+}
+
 .app-frame {
   width: min(100%, 430px);
   margin: 0 auto;
@@ -272,6 +277,76 @@ textarea {
   font-size: 0.94rem;
 }
 
+.custom-date-picker {
+  width: 100%;
+  min-width: 0;
+}
+
+.custom-date-picker-row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-wrap: wrap;
+  width: 100%;
+}
+
+.custom-date-select {
+  flex: 1 1 0;
+  width: auto;
+  min-width: 0;
+  padding: 12px 14px;
+  border: 1px solid #f2d9df;
+  border-radius: 18px;
+  background: #fff7f2;
+  color: var(--color-secondary);
+  font: inherit;
+  font-size: 0.9rem;
+  font-weight: 600;
+  appearance: none;
+  -webkit-appearance: none;
+  overflow: visible;
+  text-overflow: unset;
+  white-space: nowrap;
+}
+
+.custom-date-select:focus {
+  outline: none;
+  border-color: #e8607a;
+  box-shadow: 0 0 0 4px rgba(232, 96, 122, 0.12);
+  background: #fffafb;
+}
+
+.custom-date-select-day {
+  min-width: 65px;
+  max-width: 80px;
+  flex: 0.8 1 65px;
+}
+
+.custom-date-select-month {
+  min-width: 100px;
+  flex: 1.5 1 100px;
+}
+
+.custom-date-select-year {
+  min-width: 80px;
+  max-width: 100px;
+  flex: 1 1 80px;
+}
+
+.custom-date-separator {
+  color: #9f9aa0;
+  font-weight: 700;
+}
+
+.custom-date-picker-stack {
+  width: 100%;
+  overflow: hidden;
+}
+
+.custom-date-picker-stack .custom-date-picker + .custom-date-picker {
+  margin-top: 16px;
+}
+
 .full-width {
   grid-column: 1 / -1;
 }
@@ -365,6 +440,24 @@ textarea {
   .two-up,
   .field-grid {
     grid-template-columns: 1fr;
+  }
+
+  .custom-date-picker-row {
+    gap: 6px;
+  }
+
+  .custom-date-select {
+    padding: 11px 12px;
+    border-radius: 16px;
+    font-size: 0.94rem;
+  }
+
+  .custom-date-select-day {
+    min-width: 65px;
+  }
+
+  .custom-date-select-year {
+    max-width: 100px;
   }
 
   .countdown-card,
@@ -2891,33 +2984,52 @@ textarea {
 }
 
 .teen-dos-card {
-  background: linear-gradient(180deg, #eefcf1 0%, #f7fff8 100%);
-  border-color: rgba(94, 179, 113, 0.22);
+  background: #fff;
+  border-left: 4px solid #2f8c4d;
+  border-color: rgba(94, 179, 113, 0.16);
 }
 
 .teen-donts-card {
-  background: linear-gradient(180deg, #fff1f1 0%, #fff8f8 100%);
-  border-color: rgba(224, 123, 123, 0.22);
+  background: #fff;
+  border-left: 4px solid #c85d6f;
+  border-color: rgba(200, 93, 111, 0.16);
 }
 
 .teen-tip-list p {
   margin: 0;
   padding: 0;
   background: transparent;
+  color: var(--color-secondary);
+  flex: 1;
+  min-width: 0;
+  overflow-wrap: break-word;
+  word-wrap: break-word;
+  word-break: break-word;
+  white-space: normal;
 }
 
 .teen-tip-item {
   display: flex;
-  align-items: center;
+  align-items: flex-start;
   gap: 12px;
-  padding: 0.85rem 1rem;
-  border-radius: 0.95rem;
+  padding: 0;
+  border-radius: 0;
+  background: transparent;
 }
 
 .teen-tip-mark {
+  width: 24px;
+  height: 24px;
   flex-shrink: 0;
-  font-size: 1rem;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 999px;
+  border: 1px solid currentColor;
+  background: #fff;
+  font-size: 0.9rem;
   font-weight: 700;
+  line-height: 1;
 }
 
 .teen-dos-donts-grid {
@@ -2927,14 +3039,15 @@ textarea {
 
 .teen-tip-list {
   flex-direction: column;
+  gap: 0.9rem;
 }
 
 .teen-dos-card .teen-tip-item {
-  background: rgba(94, 179, 113, 0.12);
+  background: transparent;
 }
 
 .teen-donts-card .teen-tip-item {
-  background: rgba(232, 96, 122, 0.12);
+  background: transparent;
 }
 
 .teen-dos-card .teen-tip-mark {
@@ -5427,22 +5540,30 @@ textarea {
 
 .teen-tip-item {
   gap: 10px;
-  padding: 10px 16px;
-  border-radius: 999px;
-  white-space: nowrap;
-  overflow: hidden;
+  padding: 0;
+  border-radius: 0;
+  white-space: normal;
+  overflow: visible;
 }
 
 .teen-dos-card .teen-tip-item {
-  background: #e8f5e9;
+  background: transparent;
 }
 
 .teen-donts-card .teen-tip-item {
-  background: #fce4ec;
+  background: transparent;
 }
 
 .teen-tip-mark {
-  font-size: 0;
+  width: 22px;
+  height: 22px;
+  font-size: 0.82rem;
+  font-weight: 700;
+}
+
+.teen-dos-card .teen-tip-mark::before,
+.teen-donts-card .teen-tip-mark::before {
+  content: none;
 }
 
 .teen-dos-card .teen-tip-mark::before {
@@ -6004,4 +6125,9 @@ textarea {
     padding: 20px;
     border-radius: 24px;
   }
+}
+
+.teen-dos-card .teen-tip-mark::before,
+.teen-donts-card .teen-tip-mark::before {
+  content: none !important;
 }

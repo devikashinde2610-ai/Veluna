@@ -1,8 +1,9 @@
 import { useEffect, useState } from 'react'
 import { CalendarDays, Lock } from 'lucide-react'
+import CustomDatePicker from '../components/CustomDatePicker.jsx'
 import supabase from '../lib/supabase.js'
 import { updateStreak } from '../lib/streak.js'
-import { formatDisplayDate, isValidDate, minDateISO, todayISO } from '../utils/dateUtils.js'
+import { formatDisplayDate, isValidDate, todayISO } from '../utils/dateUtils.js'
 
 const flowOptions = ['Light', 'Normal', 'Heavy', 'Very Heavy']
 const symptomOptions = [
@@ -152,13 +153,11 @@ export default function LogPeriod() {
     setIsEditingToday(true)
   }
 
-  const handleStartDateChange = (event) => {
-    const nextValue = event.target.value
+  const handleStartDateChange = (nextValue) => {
     setStartDate(nextValue && isValidDate(nextValue) ? nextValue : '')
   }
 
-  const handleEndDateChange = (event) => {
-    const nextValue = event.target.value
+  const handleEndDateChange = (nextValue) => {
     setEndDate(nextValue && isValidDate(nextValue) ? nextValue : '')
   }
 
@@ -297,33 +296,20 @@ export default function LogPeriod() {
         </>
       ) : (
         <form className="card form-card log-form" onSubmit={handleSubmit}>
-          <div className="field-grid">
-            <label className="field">
-              <span>Period Start Date</span>
-              <input
-                type="date"
-                value={startDate}
-                min={minDateISO()}
-                max={todayDate}
-                lang="en-GB"
-                title={formatDisplayDate(startDate) || 'dd/mm/yyyy'}
-                onChange={handleStartDateChange}
-                required
-              />
-            </label>
+          <div className="custom-date-picker-stack">
+            <CustomDatePicker
+              label="Period Start Date"
+              value={startDate}
+              maxYear={Number(todayDate.slice(0, 4))}
+              onChange={handleStartDateChange}
+            />
 
-            <label className="field">
-              <span>Period End Date</span>
-              <input
-                type="date"
-                value={endDate}
-                min={minDateISO()}
-                max={todayDate}
-                lang="en-GB"
-                title={formatDisplayDate(endDate) || 'dd/mm/yyyy'}
-                onChange={handleEndDateChange}
-              />
-            </label>
+            <CustomDatePicker
+              label="Period End Date"
+              value={endDate}
+              maxYear={Number(todayDate.slice(0, 4))}
+              onChange={handleEndDateChange}
+            />
           </div>
 
           <section className="log-section">

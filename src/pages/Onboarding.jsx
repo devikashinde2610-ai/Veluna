@@ -1,7 +1,8 @@
 import { useMemo, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
+import CustomDatePicker from '../components/CustomDatePicker.jsx'
 import supabase from '../lib/supabase.js'
-import { formatDisplayDate, isValidDate, minDateISO, todayISO } from '../utils/dateUtils.js'
+import { isValidDate, todayISO } from '../utils/dateUtils.js'
 
 const initialFormState = {
   fullName: '',
@@ -62,8 +63,7 @@ export default function Onboarding({ onComplete }) {
     }))
   }
 
-  const updateDateField = (key) => (event) => {
-    const nextValue = event.target.value
+  const updateDateField = (key) => (nextValue) => {
     setForm((current) => ({
       ...current,
       [key]: nextValue && isValidDate(nextValue) ? nextValue : '',
@@ -240,18 +240,12 @@ export default function Onboarding({ onComplete }) {
                   <span>Age</span>
                   <input type="number" min="1" value={form.age} onChange={updateField('age')} />
                 </label>
-                <label className="field">
-                  <span>Date of Birth</span>
-                  <input
-                    type="date"
-                    value={form.dateOfBirth}
-                    min={minDateISO()}
-                    max={todayDate}
-                    lang="en-GB"
-                    title={formatDisplayDate(form.dateOfBirth) || 'dd/mm/yyyy'}
-                    onChange={updateDateField('dateOfBirth')}
-                  />
-                </label>
+                <CustomDatePicker
+                  label="Date of Birth"
+                  value={form.dateOfBirth}
+                  maxYear={Number(todayDate.slice(0, 4))}
+                  onChange={updateDateField('dateOfBirth')}
+                />
                 <label className="field">
                   <span>Blood Group</span>
                   <select value={form.bloodGroup} onChange={updateField('bloodGroup')}>
@@ -390,31 +384,18 @@ export default function Onboarding({ onComplete }) {
               </div>
 
               <div className="field-grid">
-                <label className="field">
-                  <span>Last period start date</span>
-                  <input
-                    type="date"
-                    value={form.lastPeriodStartDate}
-                    min={minDateISO()}
-                    max={todayDate}
-                    lang="en-GB"
-                    title={formatDisplayDate(form.lastPeriodStartDate) || 'dd/mm/yyyy'}
-                    onChange={updateDateField('lastPeriodStartDate')}
-                    required
-                  />
-                </label>
-                <label className="field">
-                  <span>Last period end date</span>
-                  <input
-                    type="date"
-                    value={form.lastPeriodEndDate}
-                    min={minDateISO()}
-                    max={todayDate}
-                    lang="en-GB"
-                    title={formatDisplayDate(form.lastPeriodEndDate) || 'dd/mm/yyyy'}
-                    onChange={updateDateField('lastPeriodEndDate')}
-                  />
-                </label>
+                <CustomDatePicker
+                  label="Last period start date"
+                  value={form.lastPeriodStartDate}
+                  maxYear={Number(todayDate.slice(0, 4))}
+                  onChange={updateDateField('lastPeriodStartDate')}
+                />
+                <CustomDatePicker
+                  label="Last period end date"
+                  value={form.lastPeriodEndDate}
+                  maxYear={Number(todayDate.slice(0, 4))}
+                  onChange={updateDateField('lastPeriodEndDate')}
+                />
               </div>
 
               <section className="log-section">
@@ -439,30 +420,18 @@ export default function Onboarding({ onComplete }) {
               </section>
 
               <div className="field-grid">
-                <label className="field">
-                  <span>Period before that (optional)</span>
-                  <input
-                    type="date"
-                    value={form.previousPeriodStartDate}
-                    min={minDateISO()}
-                    max={todayDate}
-                    lang="en-GB"
-                    title={formatDisplayDate(form.previousPeriodStartDate) || 'dd/mm/yyyy'}
-                    onChange={updateDateField('previousPeriodStartDate')}
-                  />
-                </label>
-                <label className="field">
-                  <span>Second to last period end date</span>
-                  <input
-                    type="date"
-                    value={form.previousPeriodEndDate}
-                    min={minDateISO()}
-                    max={todayDate}
-                    lang="en-GB"
-                    title={formatDisplayDate(form.previousPeriodEndDate) || 'dd/mm/yyyy'}
-                    onChange={updateDateField('previousPeriodEndDate')}
-                  />
-                </label>
+                <CustomDatePicker
+                  label="Period before that (optional)"
+                  value={form.previousPeriodStartDate}
+                  maxYear={Number(todayDate.slice(0, 4))}
+                  onChange={updateDateField('previousPeriodStartDate')}
+                />
+                <CustomDatePicker
+                  label="Second to last period end date"
+                  value={form.previousPeriodEndDate}
+                  maxYear={Number(todayDate.slice(0, 4))}
+                  onChange={updateDateField('previousPeriodEndDate')}
+                />
                 <label className="field full-width">
                   <span>How many days between your periods usually?</span>
                   <input
