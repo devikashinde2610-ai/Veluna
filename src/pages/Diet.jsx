@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from 'react'
 import { AlertTriangle, Circle, Droplets, Leaf, Pencil, Salad, Sparkles } from 'lucide-react'
 import supabase, { GROQ_KEY } from '../lib/supabase.js'
 import { updateStreak } from '../lib/streak.js'
+import { formatDisplayDate, todayISO } from '../utils/dateUtils.js'
 
 const MOOD_OPTIONS = ['Energetic', 'Normal', 'Tired', 'Bloated', 'In Pain']
 const MEAL_SLOTS = ['Breakfast', 'Lunch', 'Dinner', 'Snack 1', 'Snack 2']
@@ -22,24 +23,6 @@ const FOOD_PREFERENCE_RULES = {
   'Non-Vegetarian':
     'If Non-Vegetarian: include a good mix of plant and animal protein sources like chicken, fish, eggs.',
   Vegan: 'If Vegan: all meals must be plant based — no dairy, no eggs, no meat.',
-}
-
-function getTodayDate() {
-  return new Date().toISOString().split('T')[0]
-}
-
-function formatLogDate(value) {
-  const date = new Date(value)
-
-  if (Number.isNaN(date.getTime())) {
-    return value
-  }
-
-  return new Intl.DateTimeFormat('en-US', {
-    month: 'long',
-    day: 'numeric',
-    year: 'numeric',
-  }).format(date)
 }
 
 function normalizeDate(value) {
@@ -224,7 +207,7 @@ export default function Diet() {
   const [existingLogId, setExistingLogId] = useState(null)
   const [isEditingToday, setIsEditingToday] = useState(false)
 
-  const todayDate = getTodayDate()
+  const todayDate = todayISO()
   const currentPhase = useMemo(() => getCurrentPhase(cycleLogs), [cycleLogs])
   const summaryVisible = Boolean(activeLog) && !isEditingToday
 
@@ -673,7 +656,7 @@ What they actually ate:
               <article className="card diet-summary-card">
                 <div className="diet-card-head">
                   <div>
-                    <p className="today-summary-date">{formatLogDate(activeLog.log_date)}</p>
+                    <p className="today-summary-date">{formatDisplayDate(activeLog.log_date)}</p>
                     <h3>Today&apos;s saved meals</h3>
                   </div>
                   <span className="today-summary-check">Saved today</span>

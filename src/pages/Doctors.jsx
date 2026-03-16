@@ -4,6 +4,7 @@ import { MapContainer, Marker, Popup, TileLayer } from 'react-leaflet'
 import L from 'leaflet'
 import 'leaflet/dist/leaflet.css'
 import supabase from '../lib/supabase.js'
+import { formatDisplayDate, isValidDate, minDateISO, todayISO } from '../utils/dateUtils.js'
 
 const DEFAULT_LOCATION = {
   lat: 28.6139,
@@ -201,6 +202,7 @@ const VIDEO_DOCTORS = [
 const TIME_SLOTS = ['9AM', '10AM', '11AM', '2PM', '3PM', '4PM']
 
 export default function Doctors() {
+  const todayDate = todayISO()
   const [userLocation, setUserLocation] = useState(null)
   const [locating, setLocating] = useState(false)
   const [locationError, setLocationError] = useState('')
@@ -219,6 +221,11 @@ export default function Doctors() {
   const [videoDoctor, setVideoDoctor] = useState(null)
   const [videoStream, setVideoStream] = useState(null)
   const videoRef = useRef(null)
+
+  const handleAppointmentDateChange = (event) => {
+    const nextValue = event.target.value
+    setAppointmentDate(nextValue && isValidDate(nextValue) ? nextValue : '')
+  }
 
   useEffect(() => {
     let active = true
@@ -592,11 +599,7 @@ export default function Doctors() {
               <p className="muted">{appt.doctor_address}</p>
               <div className="appointment-meta">
                 <span>
-                  {new Date(appt.appointment_date).toLocaleDateString('en-IN', {
-                    year: 'numeric',
-                    month: 'short',
-                    day: 'numeric',
-                  })}{' '}
+                  {formatDisplayDate(appt.appointment_date)}{' '}
                   · {appt.time_slot}
                 </span>
                 <span className={`appointment-status appointment-status-${appt.status || 'confirmed'}`}>
@@ -658,7 +661,11 @@ export default function Doctors() {
                 <input
                   type="date"
                   value={appointmentDate}
-                  onChange={(event) => setAppointmentDate(event.target.value)}
+                  min={minDateISO()}
+                  max={todayDate}
+                  lang="en-GB"
+                  title={formatDisplayDate(appointmentDate) || 'dd/mm/yyyy'}
+                  onChange={handleAppointmentDateChange}
                 />
               </label>
 

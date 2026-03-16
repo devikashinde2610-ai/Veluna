@@ -2,6 +2,7 @@ import { useCallback, useEffect, useMemo, useState } from 'react'
 import { ChevronLeft, ChevronRight, Droplets, Flame, Leaf, Moon, Plus, Sparkles, Sprout, SunMedium, X } from 'lucide-react'
 import supabase from '../lib/supabase.js'
 import { fetchStreak, getStreakBadge } from '../lib/streak.js'
+import { formatDisplayDate, isValidDate, minDateISO, todayISO } from '../utils/dateUtils.js'
 
 const DAY_IN_MS = 1000 * 60 * 60 * 24
 const WEEKDAY_LABELS = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat']
@@ -168,19 +169,6 @@ function normalizeDate(value) {
   return new Date(date.getFullYear(), date.getMonth(), date.getDate())
 }
 
-function formatDate(value, options) {
-  const date = normalizeDate(value)
-  if (!date) {
-    return 'Unknown'
-  }
-
-  return new Intl.DateTimeFormat('en-US', options).format(date)
-}
-
-function getTodayDate() {
-  return new Date().toISOString().split('T')[0]
-}
-
 function diffInDays(laterDate, earlierDate) {
   return Math.round((laterDate - earlierDate) / DAY_IN_MS)
 }
@@ -237,6 +225,7 @@ function isFertileDay(cycleDay) {
 }
 
 export default function Dashboard({ userId }) {
+  const todayDate = todayISO()
   const [cycleLogs, setCycleLogs] = useState([])
   const [healthReport, setHealthReport] = useState(null)
   const [symptomLogs, setSymptomLogs] = useState([])
@@ -572,6 +561,13 @@ export default function Dashboard({ userId }) {
     }))
   }
 
+  const updatePeriodDateField = (key, value) => {
+    setPeriodForm((current) => ({
+      ...current,
+      [key]: value && isValidDate(value) ? value : '',
+    }))
+  }
+
   async function handlePeriodSave(event) {
     event.preventDefault()
     setPeriodSaving(true)
@@ -650,13 +646,7 @@ export default function Dashboard({ userId }) {
             : `${cycleSummary.daysUntilNextPeriod} day${cycleSummary.daysUntilNextPeriod === 1 ? '' : 's'}`}
         </div>
         <p className="dashboard-predicted-date">
-          {cycleSummary.predictedNextPeriod
-            ? formatDate(cycleSummary.predictedNextPeriod, {
-                month: 'long',
-                day: 'numeric',
-                year: 'numeric',
-              })
-            : 'No predicted date yet'}
+          {cycleSummary.predictedNextPeriod ? formatDisplayDate(cycleSummary.predictedNextPeriod) : 'No predicted date yet'}
         </p>
       </section>
 
@@ -739,11 +729,7 @@ export default function Dashboard({ userId }) {
                 menopauseLogs.map((entry, index) => (
                   <article key={entry.id ?? index} className="menopause-log-card">
                     <p className="symptom-entry-date">
-                      {formatDate(getSymptomDate(entry), {
-                        month: 'short',
-                        day: 'numeric',
-                        year: 'numeric',
-                      })}
+                      {formatDisplayDate(getSymptomDate(entry))}
                     </p>
                     <div className="pill-row symptom-pill-row">
                       {getSymptomList(entry)
@@ -839,7 +825,7 @@ export default function Dashboard({ userId }) {
           <div className="premium-cal-selected-card">
             <div className="premium-cal-selected-info">
               <span className="premium-cal-selected-date">
-                {formatDate(selectedDay.date, { month: 'short', day: 'numeric' })}
+                {formatDisplayDate(selectedDay.date)}
               </span>
               <span className="premium-cal-selected-cycle-day">
                 {selectedDay.cycleDay !== null ? `Cycle Day ${selectedDay.cycleDay}` : 'No cycle data'}
@@ -965,7 +951,11 @@ export default function Dashboard({ userId }) {
                   <input
                     type="date"
                     value={periodForm.startDate}
-                    onChange={(event) => updatePeriodField('startDate', event.target.value)}
+                    min={minDateISO()}
+                    max={todayDate}
+                    lang="en-GB"
+                    title={formatDisplayDate(periodForm.startDate) || 'dd/mm/yyyy'}
+                    onChange={(event) => updatePeriodDateField('startDate', event.target.value)}
                     required
                   />
                 </label>
@@ -974,7 +964,11 @@ export default function Dashboard({ userId }) {
                   <input
                     type="date"
                     value={periodForm.endDate}
-                    onChange={(event) => updatePeriodField('endDate', event.target.value)}
+                    min={minDateISO()}
+                    max={todayDate}
+                    lang="en-GB"
+                    title={formatDisplayDate(periodForm.endDate) || 'dd/mm/yyyy'}
+                    onChange={(event) => updatePeriodDateField('endDate', event.target.value)}
                   />
                 </label>
               </div>

@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from 'react'
 import { User } from 'lucide-react'
 import supabase from '../lib/supabase.js'
+import { formatDisplayDate, isValidDate, minDateISO, todayISO } from '../utils/dateUtils.js'
 
 const bloodGroupOptions = ['A+', 'A-', 'B+', 'B-', 'O+', 'O-', 'AB+', 'AB-']
 const familyHistoryOptions = ['yes', 'no', 'not sure']
@@ -11,6 +12,7 @@ function toNumberOrNull(value) {
 }
 
 export default function Profile() {
+  const todayDate = todayISO()
   const [profileId, setProfileId] = useState(null)
   const [fullName, setFullName] = useState('')
   const [age, setAge] = useState('')
@@ -148,6 +150,11 @@ export default function Profile() {
     setSaving(false)
   }
 
+  const handleDateOfBirthChange = (event) => {
+    const nextValue = event.target.value
+    setDateOfBirth(nextValue && isValidDate(nextValue) ? nextValue : '')
+  }
+
   return (
     <div className="profile-page page-stack">
       <header className="section-title">
@@ -205,7 +212,11 @@ export default function Profile() {
                 <input
                   type="date"
                   value={dateOfBirth}
-                  onChange={(event) => setDateOfBirth(event.target.value)}
+                  min={minDateISO()}
+                  max={todayDate}
+                  lang="en-GB"
+                  title={formatDisplayDate(dateOfBirth) || 'dd/mm/yyyy'}
+                  onChange={handleDateOfBirthChange}
                 />
               </label>
               <label className="field">

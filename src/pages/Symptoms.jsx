@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from 'react'
 import { HeartPulse, Lock } from 'lucide-react'
 import supabase from '../lib/supabase.js'
 import { updateStreak } from '../lib/streak.js'
+import { formatDisplayDate, isValidDate, minDateISO, todayISO } from '../utils/dateUtils.js'
 
 const symptomOptions = [
   'Acne',
@@ -92,23 +93,6 @@ function MoodHearts({ moodValue, size = 16 }) {
   )
 }
 
-function getTodayDate() {
-  return new Date().toISOString().split('T')[0]
-}
-
-function formatLogDate(value) {
-  const date = new Date(value)
-  if (Number.isNaN(date.getTime())) {
-    return value
-  }
-
-  return new Intl.DateTimeFormat('en-US', {
-    month: 'short',
-    day: 'numeric',
-    year: 'numeric',
-  }).format(date)
-}
-
 function getSeverityTone(severity) {
   if (severity <= 3) {
     return 'success'
@@ -151,7 +135,7 @@ export default function Symptoms() {
   const [activeLog, setActiveLog] = useState(null)
   const [isEditing, setIsEditing] = useState(false)
 
-  const todayDate = getTodayDate()
+  const todayDate = todayISO()
   const isSelectedLogReadOnly = Boolean(activeLog) && activeLog.log_date !== todayDate
   const showSummaryCard = Boolean(activeLog) && (!isEditing || isSelectedLogReadOnly)
   const datesWithExistingEntries = useMemo(
@@ -337,6 +321,11 @@ export default function Symptoms() {
     setTimeout(() => setMoodAnimating(null), 400)
   }
 
+  const handleSelectedDateChange = (event) => {
+    const nextValue = event.target.value
+    setSelectedDate(nextValue && isValidDate(nextValue) ? nextValue : '')
+  }
+
   const beginEditing = () => {
     if (!activeLog || activeLog.log_date !== todayDate) {
       return
@@ -426,8 +415,11 @@ export default function Symptoms() {
           <input
             type="date"
             value={selectedDate}
-            onChange={(event) => setSelectedDate(event.target.value)}
+            min={minDateISO()}
+            onChange={handleSelectedDateChange}
             max={todayDate}
+            lang="en-GB"
+            title={formatDisplayDate(selectedDate) || 'dd/mm/yyyy'}
           />
         </label>
         {selectedDate !== todayDate && datesWithExistingEntries.has(selectedDate) ? (
@@ -443,7 +435,7 @@ export default function Symptoms() {
           <section className="card today-summary-card">
             <div className="today-summary-head">
               <div>
-                <p className="today-summary-date">{formatLogDate(activeLog.log_date)}</p>
+                <p className="today-summary-date">{formatDisplayDate(activeLog.log_date)}</p>
                 <h2 className="today-summary-title">
                   {activeLog.log_date === todayDate ? "Today's Symptom Log" : 'Symptom Log'}
                 </h2>
@@ -629,7 +621,7 @@ export default function Symptoms() {
           pastLogs.map((log, index) => (
             <article key={log.id ?? index} className="card symptom-history-card">
               <div className="symptom-history-head">
-                <p className="symptom-history-date">{formatLogDate(log.log_date)}</p>
+                <p className="symptom-history-date">{formatDisplayDate(log.log_date)}</p>
                 <div className="history-entry-meta">
                   {log.log_date !== todayDate ? (
                     <span className="history-lock-badge">
@@ -681,7 +673,7 @@ export default function Symptoms() {
                       title={`Severity ${value}`}
                     ></div>
                   </div>
-                  <span className="trend-label">{formatLogDate(log.log_date).slice(0, 6)}</span>
+                  <span className="trend-label">{formatDisplayDate(log.log_date)}</span>
                 </div>
               )
             })}

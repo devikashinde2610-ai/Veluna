@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from 'react'
 import { Activity } from 'lucide-react'
 import supabase, { GROQ_KEY } from '../lib/supabase.js'
+import { formatDisplayDate } from '../utils/dateUtils.js'
 
 const initialFormState = {
   age: '',
@@ -153,16 +154,12 @@ function formatShortDate(dateString) {
     return 'Unknown'
   }
 
-  const date = new Date(dateString)
-
-  if (Number.isNaN(date.getTime())) {
+  const formatted = formatDisplayDate(dateString)
+  if (!formatted) {
     return 'Unknown'
   }
 
-  return new Intl.DateTimeFormat('en-US', {
-    month: 'short',
-    day: 'numeric',
-  }).format(date)
+  return formatted
 }
 
 export default function Analysis() {

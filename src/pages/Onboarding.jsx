@@ -1,6 +1,7 @@
 import { useMemo, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import supabase from '../lib/supabase.js'
+import { formatDisplayDate, isValidDate, minDateISO, todayISO } from '../utils/dateUtils.js'
 
 const initialFormState = {
   fullName: '',
@@ -33,6 +34,7 @@ function toNumberOrNull(value) {
 }
 
 export default function Onboarding({ onComplete }) {
+  const todayDate = todayISO()
   const navigate = useNavigate()
   const [step, setStep] = useState(0)
   const [form, setForm] = useState(initialFormState)
@@ -57,6 +59,14 @@ export default function Onboarding({ onComplete }) {
     setForm((current) => ({
       ...current,
       [key]: event.target.value,
+    }))
+  }
+
+  const updateDateField = (key) => (event) => {
+    const nextValue = event.target.value
+    setForm((current) => ({
+      ...current,
+      [key]: nextValue && isValidDate(nextValue) ? nextValue : '',
     }))
   }
 
@@ -235,7 +245,11 @@ export default function Onboarding({ onComplete }) {
                   <input
                     type="date"
                     value={form.dateOfBirth}
-                    onChange={updateField('dateOfBirth')}
+                    min={minDateISO()}
+                    max={todayDate}
+                    lang="en-GB"
+                    title={formatDisplayDate(form.dateOfBirth) || 'dd/mm/yyyy'}
+                    onChange={updateDateField('dateOfBirth')}
                   />
                 </label>
                 <label className="field">
@@ -381,7 +395,11 @@ export default function Onboarding({ onComplete }) {
                   <input
                     type="date"
                     value={form.lastPeriodStartDate}
-                    onChange={updateField('lastPeriodStartDate')}
+                    min={minDateISO()}
+                    max={todayDate}
+                    lang="en-GB"
+                    title={formatDisplayDate(form.lastPeriodStartDate) || 'dd/mm/yyyy'}
+                    onChange={updateDateField('lastPeriodStartDate')}
                     required
                   />
                 </label>
@@ -390,7 +408,11 @@ export default function Onboarding({ onComplete }) {
                   <input
                     type="date"
                     value={form.lastPeriodEndDate}
-                    onChange={updateField('lastPeriodEndDate')}
+                    min={minDateISO()}
+                    max={todayDate}
+                    lang="en-GB"
+                    title={formatDisplayDate(form.lastPeriodEndDate) || 'dd/mm/yyyy'}
+                    onChange={updateDateField('lastPeriodEndDate')}
                   />
                 </label>
               </div>
@@ -422,7 +444,11 @@ export default function Onboarding({ onComplete }) {
                   <input
                     type="date"
                     value={form.previousPeriodStartDate}
-                    onChange={updateField('previousPeriodStartDate')}
+                    min={minDateISO()}
+                    max={todayDate}
+                    lang="en-GB"
+                    title={formatDisplayDate(form.previousPeriodStartDate) || 'dd/mm/yyyy'}
+                    onChange={updateDateField('previousPeriodStartDate')}
                   />
                 </label>
                 <label className="field">
@@ -430,7 +456,11 @@ export default function Onboarding({ onComplete }) {
                   <input
                     type="date"
                     value={form.previousPeriodEndDate}
-                    onChange={updateField('previousPeriodEndDate')}
+                    min={minDateISO()}
+                    max={todayDate}
+                    lang="en-GB"
+                    title={formatDisplayDate(form.previousPeriodEndDate) || 'dd/mm/yyyy'}
+                    onChange={updateDateField('previousPeriodEndDate')}
                   />
                 </label>
                 <label className="field full-width">

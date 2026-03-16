@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react'
 import { CalendarDays, Lock } from 'lucide-react'
 import supabase from '../lib/supabase.js'
 import { updateStreak } from '../lib/streak.js'
+import { formatDisplayDate, isValidDate, minDateISO, todayISO } from '../utils/dateUtils.js'
 
 const flowOptions = ['Light', 'Normal', 'Heavy', 'Very Heavy']
 const symptomOptions = [
@@ -19,27 +20,9 @@ const symptomOptions = [
   'Back Pain',
 ]
 
-function getTodayDate() {
-  return new Date().toISOString().split('T')[0]
-}
-
-function formatLogDate(value) {
-  const date = new Date(value)
-
-  if (Number.isNaN(date.getTime())) {
-    return value
-  }
-
-  return new Intl.DateTimeFormat('en-US', {
-    month: 'long',
-    day: 'numeric',
-    year: 'numeric',
-  }).format(date)
-}
-
 export default function LogPeriod() {
   const [profileId, setProfileId] = useState(null)
-  const [startDate, setStartDate] = useState(getTodayDate())
+  const [startDate, setStartDate] = useState(todayISO())
   const [endDate, setEndDate] = useState('')
   const [flowIntensity, setFlowIntensity] = useState('')
   const [selectedSymptoms, setSelectedSymptoms] = useState([])
@@ -51,7 +34,7 @@ export default function LogPeriod() {
   const [todayLog, setTodayLog] = useState(null)
   const [isEditingToday, setIsEditingToday] = useState(false)
 
-  const todayDate = getTodayDate()
+  const todayDate = todayISO()
   const showSummaryCard = Boolean(todayLog) && !isEditingToday
   const isTodayEntry = todayLog?.start_date === todayDate
 
@@ -169,6 +152,16 @@ export default function LogPeriod() {
     setIsEditingToday(true)
   }
 
+  const handleStartDateChange = (event) => {
+    const nextValue = event.target.value
+    setStartDate(nextValue && isValidDate(nextValue) ? nextValue : '')
+  }
+
+  const handleEndDateChange = (event) => {
+    const nextValue = event.target.value
+    setEndDate(nextValue && isValidDate(nextValue) ? nextValue : '')
+  }
+
   const handleSubmit = async (event) => {
     event.preventDefault()
     setSuccessMessage('')
@@ -251,7 +244,7 @@ export default function LogPeriod() {
           <section className="card today-summary-card">
             <div className="today-summary-head">
               <div>
-                <p className="today-summary-date">{formatLogDate(todayLog.start_date)}</p>
+                <p className="today-summary-date">{formatDisplayDate(todayLog.start_date)}</p>
                 <h2 className="today-summary-title">
                   {isTodayEntry ? "Today's Period Log" : 'Period Log'}
                 </h2>
@@ -271,7 +264,7 @@ export default function LogPeriod() {
                 Flow: {todayLog.flow_intensity || 'Not specified'}
               </span>
               {todayLog.end_date ? (
-                <span className="status-pill neutral">Ends: {formatLogDate(todayLog.end_date)}</span>
+                <span className="status-pill neutral">Ends: {formatDisplayDate(todayLog.end_date)}</span>
               ) : null}
             </div>
 
@@ -310,7 +303,11 @@ export default function LogPeriod() {
               <input
                 type="date"
                 value={startDate}
-                onChange={(event) => setStartDate(event.target.value)}
+                min={minDateISO()}
+                max={todayDate}
+                lang="en-GB"
+                title={formatDisplayDate(startDate) || 'dd/mm/yyyy'}
+                onChange={handleStartDateChange}
                 required
               />
             </label>
@@ -320,7 +317,11 @@ export default function LogPeriod() {
               <input
                 type="date"
                 value={endDate}
-                onChange={(event) => setEndDate(event.target.value)}
+                min={minDateISO()}
+                max={todayDate}
+                lang="en-GB"
+                title={formatDisplayDate(endDate) || 'dd/mm/yyyy'}
+                onChange={handleEndDateChange}
               />
             </label>
           </div>
