@@ -1,6 +1,6 @@
 import { useMemo, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { Calendar } from 'lucide-react'
+import { Calendar, ChevronLeft, ChevronRight } from 'lucide-react'
 import CustomDatePicker from '../components/CustomDatePicker.jsx'
 import supabase from '../lib/supabase.js'
 import { isValidDate, todayISO } from '../utils/dateUtils.js'
@@ -68,6 +68,184 @@ function lbsToKg(lbsValue) {
   return (lbs / 2.2046226218).toFixed(1)
 }
 
+function parseISODate(dateString) {
+  if (!dateString || !isValidDate(dateString)) return null
+  const [year, month, day] = dateString.split('-').map(Number)
+  return new Date(year, month - 1, day)
+}
+
+function toISODate(date) {
+  const yyyy = String(date.getFullYear())
+  const mm = String(date.getMonth() + 1).padStart(2, '0')
+  const dd = String(date.getDate()).padStart(2, '0')
+  return `${yyyy}-${mm}-${dd}`
+}
+
+function startOfDay(date) {
+  return new Date(date.getFullYear(), date.getMonth(), date.getDate())
+}
+
+function formatPrettyISO(dateString) {
+  const date = parseISODate(dateString)
+  if (!date) return ''
+  return new Intl.DateTimeFormat('en-US', { day: 'numeric', month: 'short', year: 'numeric' }).format(date)
+}
+
+const RANGE_WEEKDAYS = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat']
+
+function PeriodRangeCalendar({
+  title,
+  subtitle,
+  startISO,
+  endISO,
+  activeEdge,
+  setActiveEdge,
+  monthStart,
+  setMonthStart,
+  minMonthStart,
+  maxMonthStart,
+  maxISO,
+  onSetStart,
+  onSetEnd,
+}) {
+  const maxDate = startOfDay(parseISODate(maxISO) ?? new Date())
+  const year = monthStart.getFullYear()
+  const monthIndex = monthStart.getMonth()
+  const daysInMonth = new Date(year, monthIndex + 1, 0).getDate()
+  const firstWeekday = new Date(year, monthIndex, 1).getDay()
+
+  const startDate = startISO ? startOfDay(parseISODate(startISO) ?? new Date()) : null
+  const endDate = endISO ? startOfDay(parseISODate(endISO) ?? new Date()) : null
+
+  const minSelectableForEnd = startDate ?? null
+
+  const isDisabled = (dateObj) => {
+    const dayDate = startOfDay(dateObj)
+    if (dayDate > maxDate) return true
+    if (activeEdge === 'end' && minSelectableForEnd && dayDate < minSelectableForEnd) return true
+    return false
+  }
+
+  const isInRange = (dateObj) => {
+    if (!startDate || !endDate) return false
+    const dayDate = startOfDay(dateObj)
+    return dayDate > startDate && dayDate < endDate
+  }
+
+  const chipValue = (iso) => (iso ? formatPrettyISO(iso) : 'Select')
+
+  const canPrev = monthStart > minMonthStart
+  const canNext = monthStart < maxMonthStart
+  const monthLabel = new Intl.DateTimeFormat('en-US', { month: 'long', year: 'numeric' }).format(monthStart)
+
+  return (
+    <section className="range-calendar-shell">
+      <div className="range-calendar-head">
+        <div>
+          <p className="card-label">{title}</p>
+          {subtitle ? <p className="muted">{subtitle}</p> : null}
+        </div>
+      </div>
+
+      <div className="range-calendar-chips">
+        <button
+          type="button"
+          className={`range-chip${activeEdge === 'start' ? ' is-active' : ''}`}
+          onClick={() => setActiveEdge('start')}
+          aria-pressed={activeEdge === 'start'}
+        >
+          <span className="range-chip-label">Start</span>
+          <span className="range-chip-value">{chipValue(startISO)}</span>
+        </button>
+
+        <button
+          type="button"
+          className={`range-chip${activeEdge === 'end' ? ' is-active' : ''}`}
+          onClick={() => setActiveEdge('end')}
+          aria-pressed={activeEdge === 'end'}
+          disabled={!startISO}
+          title={!startISO ? 'Select a start date first' : ''}
+        >
+          <span className="range-chip-label">End</span>
+          <span className="range-chip-value">{chipValue(endISO)}</span>
+        </button>
+      </div>
+
+      <div className="range-calendar-nav">
+        <button
+          type="button"
+          className="onboarding-secondary-button"
+          onClick={() => setMonthStart((current) => new Date(current.getFullYear(), current.getMonth() - 1, 1))}
+          disabled={!canPrev}
+          aria-label="Previous month"
+        >
+          <ChevronLeft size={16} />
+        </button>
+        <div className="range-calendar-month">{monthLabel}</div>
+        <button
+          type="button"
+          className="onboarding-secondary-button"
+          onClick={() => setMonthStart((current) => new Date(current.getFullYear(), current.getMonth() + 1, 1))}
+          disabled={!canNext}
+          aria-label="Next month"
+        >
+          <ChevronRight size={16} />
+        </button>
+      </div>
+
+      <div className="booking-calendar range-calendar-grid" role="group" aria-label="Choose dates">
+        <div className="booking-calendar-grid booking-calendar-weekdays" aria-hidden="true">
+          {RANGE_WEEKDAYS.map((label) => (
+            <div key={label} className="booking-calendar-weekday">{label}</div>
+          ))}
+        </div>
+
+        <div className="booking-calendar-grid">
+          {Array.from({ length: firstWeekday }).map((_, idx) => (
+            <div key={`blank-${idx}`} className="booking-calendar-blank"></div>
+          ))}
+
+          {Array.from({ length: daysInMonth }, (_, idx) => {
+            const day = idx + 1
+            const dateObj = new Date(year, monthIndex, day)
+            const iso = toISODate(dateObj)
+            const disabled = isDisabled(dateObj)
+            const selected = iso === startISO || iso === endISO
+            const inRange = isInRange(dateObj)
+
+            return (
+              <button
+                key={iso}
+                type="button"
+                className={[
+                  'booking-calendar-day',
+                  selected ? 'is-selected' : '',
+                  disabled ? 'is-disabled' : '',
+                  inRange ? 'is-in-range' : '',
+                ].filter(Boolean).join(' ')}
+                onClick={() => {
+                  if (disabled) return
+                  if (activeEdge === 'start') {
+                    onSetStart(iso)
+                    setActiveEdge('end')
+                    return
+                  }
+                  onSetEnd(iso)
+                }}
+                disabled={disabled}
+                aria-pressed={selected}
+                aria-label={iso}
+              >
+                {day}
+              </button>
+            )
+          })}
+        </div>
+      </div>
+    </section>
+  )
+}
+
 export default function Onboarding({ onComplete }) {
   const todayDate = todayISO()
   const navigate = useNavigate()
@@ -75,30 +253,25 @@ export default function Onboarding({ onComplete }) {
   const [form, setForm] = useState(initialFormState)
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState('')
-  
-  // Date picker state variables
-  const [showLastPeriodStartDropdown, setShowLastPeriodStartDropdown] = useState(false)
-  const [showLastPeriodEndDropdown, setShowLastPeriodEndDropdown] = useState(false)
-  const [showPreviousStartDropdown, setShowPreviousStartDropdown] = useState(false)
-  const [showPreviousEndDropdown, setShowPreviousEndDropdown] = useState(false)
-  const [lastStartPickerDay, setLastStartPickerDay] = useState('')
-  const [lastStartPickerMonth, setLastStartPickerMonth] = useState('')
-  const [lastStartPickerYear, setLastStartPickerYear] = useState('')
-  const [lastEndPickerDay, setLastEndPickerDay] = useState('')
-  const [lastEndPickerMonth, setLastEndPickerMonth] = useState('')
-  const [lastEndPickerYear, setLastEndPickerYear] = useState('')
-  const [prevStartPickerDay, setPrevStartPickerDay] = useState('')
-  const [prevStartPickerMonth, setPrevStartPickerMonth] = useState('')
-  const [prevStartPickerYear, setPrevStartPickerYear] = useState('')
-  const [prevEndPickerDay, setPrevEndPickerDay] = useState('')
-  const [prevEndPickerMonth, setPrevEndPickerMonth] = useState('')
-  const [prevEndPickerYear, setPrevEndPickerYear] = useState('')
+
   const [flowIntensityLevel, setFlowIntensityLevel] = useState(0)
   const [heightUnit, setHeightUnit] = useState('cm')
   const [heightFt, setHeightFt] = useState('')
   const [heightIn, setHeightIn] = useState('')
   const [weightUnit, setWeightUnit] = useState('kg')
   const [weightLbs, setWeightLbs] = useState('')
+
+  const [lastRangeMonth, setLastRangeMonth] = useState(() => {
+    const base = parseISODate(todayDate) ?? new Date()
+    return new Date(base.getFullYear(), base.getMonth(), 1)
+  })
+  const [lastActiveEdge, setLastActiveEdge] = useState('start')
+  const [showPreviousRange, setShowPreviousRange] = useState(false)
+  const [prevRangeMonth, setPrevRangeMonth] = useState(() => {
+    const base = parseISODate(todayDate) ?? new Date()
+    return new Date(base.getFullYear(), base.getMonth(), 1)
+  })
+  const [prevActiveEdge, setPrevActiveEdge] = useState('start')
 
   const bmi = useMemo(() => {
     const height = Number(form.heightCm)
@@ -267,86 +440,6 @@ export default function Onboarding({ onComplete }) {
       ...current,
       flowIntensity: intensityLevelToText(level),
     }))
-  }
-
-  // Last Period Start Date functions
-  function openLastPeriodStartPicker() {
-    const parsed = parseDateString(form.lastPeriodStartDate)
-    setLastStartPickerDay(parsed.day)
-    setLastStartPickerMonth(parsed.month)
-    setLastStartPickerYear(parsed.year)
-    setShowLastPeriodStartDropdown(true)
-  }
-
-  function confirmLastPeriodStart() {
-    if (lastStartPickerDay && lastStartPickerMonth && lastStartPickerYear) {
-      const newDate = formatDateString(lastStartPickerYear, lastStartPickerMonth, lastStartPickerDay)
-      setForm((current) => ({
-        ...current,
-        lastPeriodStartDate: newDate,
-      }))
-      setShowLastPeriodStartDropdown(false)
-    }
-  }
-
-  // Last Period End Date functions
-  function openLastPeriodEndPicker() {
-    const parsed = parseDateString(form.lastPeriodEndDate)
-    setLastEndPickerDay(parsed.day)
-    setLastEndPickerMonth(parsed.month)
-    setLastEndPickerYear(parsed.year)
-    setShowLastPeriodEndDropdown(true)
-  }
-
-  function confirmLastPeriodEnd() {
-    if (lastEndPickerDay && lastEndPickerMonth && lastEndPickerYear) {
-      const newDate = formatDateString(lastEndPickerYear, lastEndPickerMonth, lastEndPickerDay)
-      setForm((current) => ({
-        ...current,
-        lastPeriodEndDate: newDate,
-      }))
-      setShowLastPeriodEndDropdown(false)
-    }
-  }
-
-  // Previous Period Start Date functions
-  function openPreviousStartPicker() {
-    const parsed = parseDateString(form.previousPeriodStartDate)
-    setPrevStartPickerDay(parsed.day)
-    setPrevStartPickerMonth(parsed.month)
-    setPrevStartPickerYear(parsed.year)
-    setShowPreviousStartDropdown(true)
-  }
-
-  function confirmPreviousStart() {
-    if (prevStartPickerDay && prevStartPickerMonth && prevStartPickerYear) {
-      const newDate = formatDateString(prevStartPickerYear, prevStartPickerMonth, prevStartPickerDay)
-      setForm((current) => ({
-        ...current,
-        previousPeriodStartDate: newDate,
-      }))
-      setShowPreviousStartDropdown(false)
-    }
-  }
-
-  // Previous Period End Date functions
-  function openPreviousEndPicker() {
-    const parsed = parseDateString(form.previousPeriodEndDate)
-    setPrevEndPickerDay(parsed.day)
-    setPrevEndPickerMonth(parsed.month)
-    setPrevEndPickerYear(parsed.year)
-    setShowPreviousEndDropdown(true)
-  }
-
-  function confirmPreviousEnd() {
-    if (prevEndPickerDay && prevEndPickerMonth && prevEndPickerYear) {
-      const newDate = formatDateString(prevEndPickerYear, prevEndPickerMonth, prevEndPickerDay)
-      setForm((current) => ({
-        ...current,
-        previousPeriodEndDate: newDate,
-      }))
-      setShowPreviousEndDropdown(false)
-    }
   }
 
   const goNext = () => {
@@ -724,7 +817,7 @@ export default function Onboarding({ onComplete }) {
                 <label className="field full-width">
                   <span>Any known conditions</span>
                   <textarea
-                    rows="4"
+                    rows="3"
                     value={form.medicalConditions}
                     onChange={updateField('medicalConditions')}
                   />
@@ -732,7 +825,7 @@ export default function Onboarding({ onComplete }) {
                 <label className="field full-width">
                   <span>Current medications</span>
                   <textarea
-                    rows="4"
+                    rows="3"
                     value={form.currentMedications}
                     onChange={updateField('currentMedications')}
                   />
