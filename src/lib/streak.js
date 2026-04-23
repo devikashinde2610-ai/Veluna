@@ -1,4 +1,5 @@
 import supabase from './supabase.js'
+import { parseLocalDate, todayISO } from '../utils/dateUtils.js'
 
 /**
  * Updates the user's streak in the `streaks` table.
@@ -16,7 +17,7 @@ import supabase from './supabase.js'
 export async function updateStreak(profileId) {
   if (!profileId) return { streak: null, milestone: null }
 
-  const today = new Date().toISOString().split('T')[0]
+  const today = todayISO()
 
   // Fetch existing streak row
   const { data: existing, error: fetchError } = await supabase
@@ -58,8 +59,11 @@ export async function updateStreak(profileId) {
   }
 
   // Calculate day difference
-  const lastActive = new Date(existing.last_active_date + 'T00:00:00')
-  const todayDate = new Date(today + 'T00:00:00')
+  const lastActive = parseLocalDate(existing.last_active_date)
+  const todayDate = parseLocalDate(today)
+  if (!lastActive || !todayDate) {
+    return { streak: existing, milestone: null }
+  }
   const diffMs = todayDate - lastActive
   const diffDays = Math.round(diffMs / (1000 * 60 * 60 * 24))
 

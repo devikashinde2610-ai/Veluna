@@ -12,6 +12,39 @@ function toNumberOrNull(value) {
   return value === '' ? null : Number(value)
 }
 
+function cmToFtIn(cmValue) {
+  const cm = Number(cmValue)
+  if (!cm || cm <= 0) return { ft: '', inch: '' }
+  const totalInches = cm / 2.54
+  const ft = Math.floor(totalInches / 12)
+  let inch = Math.round(totalInches - ft * 12)
+  if (inch === 12) {
+    inch = 0
+    return { ft: String(ft + 1), inch: '0' }
+  }
+  return { ft: String(ft), inch: String(inch) }
+}
+
+function ftInToCm(feetValue, inchValue) {
+  const feet = Number(feetValue) || 0
+  const inches = Number(inchValue) || 0
+  const totalInches = feet * 12 + inches
+  if (!totalInches) return ''
+  return String(Math.round(totalInches * 2.54))
+}
+
+function kgToLbs(kgValue) {
+  const kg = Number(kgValue)
+  if (!kg || kg <= 0) return ''
+  return (kg * 2.2046226218).toFixed(1)
+}
+
+function lbsToKg(lbsValue) {
+  const lbs = Number(lbsValue)
+  if (!lbs || lbs <= 0) return ''
+  return (lbs / 2.2046226218).toFixed(1)
+}
+
 export default function Profile() {
   const todayDate = todayISO()
   const [profileId, setProfileId] = useState(null)
@@ -19,6 +52,11 @@ export default function Profile() {
   const [age, setAge] = useState('')
   const [heightCm, setHeightCm] = useState('')
   const [weightKg, setWeightKg] = useState('')
+  const [heightUnit, setHeightUnit] = useState('cm')
+  const [heightFt, setHeightFt] = useState('')
+  const [heightIn, setHeightIn] = useState('')
+  const [weightUnit, setWeightUnit] = useState('kg')
+  const [weightLbs, setWeightLbs] = useState('')
   const [bloodGroup, setBloodGroup] = useState('')
   const [dateOfBirth, setDateOfBirth] = useState('')
   const [familyHistoryPcos, setFamilyHistoryPcos] = useState('not sure')
@@ -42,6 +80,18 @@ export default function Profile() {
     const meters = height / 100
     return weight / (meters * meters)
   }, [heightCm, weightKg])
+
+  const calculateAge = (dob) => {
+    if (!dob) return ''
+    const today = new Date()
+    const birthDate = new Date(dob)
+    let age = today.getFullYear() - birthDate.getFullYear()
+    const monthDiff = today.getMonth() - birthDate.getMonth()
+    if (monthDiff < 0 || (monthDiff === 0 && today.getDate() < birthDate.getDate())) {
+      age--
+    }
+    return age
+  }
 
   useEffect(() => {
     let active = true
@@ -104,6 +154,58 @@ export default function Profile() {
     }
   }, [])
 
+  const toggleHeightUnit = (nextUnit) => {
+    if (nextUnit === heightUnit) return
+
+    if (nextUnit === 'ftin') {
+      const converted = cmToFtIn(heightCm)
+      setHeightFt(converted.ft)
+      setHeightIn(converted.inch)
+      setHeightUnit('ftin')
+      return
+    }
+
+    const cm = ftInToCm(heightFt, heightIn)
+    if (cm !== '') {
+      setHeightCm(cm)
+    }
+    setHeightUnit('cm')
+  }
+
+  const toggleWeightUnit = (nextUnit) => {
+    if (nextUnit === weightUnit) return
+
+    if (nextUnit === 'lbs') {
+      setWeightLbs(kgToLbs(weightKg))
+      setWeightUnit('lbs')
+      return
+    }
+
+    const kg = lbsToKg(weightLbs)
+    if (kg !== '') {
+      setWeightKg(kg)
+    }
+    setWeightUnit('kg')
+  }
+
+  const handleFeetChange = (event) => {
+    const nextFeet = event.target.value
+    setHeightFt(nextFeet)
+    setHeightCm(ftInToCm(nextFeet, heightIn))
+  }
+
+  const handleInchesChange = (event) => {
+    const nextIn = event.target.value
+    setHeightIn(nextIn)
+    setHeightCm(ftInToCm(heightFt, nextIn))
+  }
+
+  const handleLbsChange = (event) => {
+    const nextLbs = event.target.value
+    setWeightLbs(nextLbs)
+    setWeightKg(lbsToKg(nextLbs))
+  }
+
   const handleSubmit = async (event) => {
     event.preventDefault()
     setError('')
@@ -151,8 +253,21 @@ export default function Profile() {
     setSaving(false)
   }
 
-  const handleDateOfBirthChange = (nextValue) => {
-    setDateOfBirth(nextValue && isValidDate(nextValue) ? nextValue : '')
+  const handleDobChange = (dateValue) => {
+    console.log('[Profile] handleDobChange received:', dateValue)
+    setDateOfBirth(dateValue)
+    if (dateValue) {
+      const today = new Date()
+      const birth = new Date(dateValue)
+      let age = today.getFullYear() - birth.getFullYear()
+      const m = today.getMonth() - birth.getMonth()
+      if (m < 0 || (m === 0 && today.getDate() < birth.getDate())) age--
+      console.log('[Profile] Calculated age:', age)
+      setAge(age.toString())
+    } else {
+      console.log('[Profile] Invalid or empty date, clearing age')
+      setAge('')
+    }
   }
 
   return (
@@ -205,32 +320,111 @@ export default function Profile() {
               </label>
               <label className="field">
                 <span>Age</span>
-                <input type="number" min="1" value={age} onChange={(event) => setAge(event.target.value)} />
+                <input 
+                  type="number" 
+                  min="1" 
+                  value={age} 
+                  onChange={(event) => setAge(event.target.value)}
+                  disabled={!!dateOfBirth}
+                />
+                {dateOfBirth && (
+                  <span className="field-note">Auto-calculated from date of birth</span>
+                )}
               </label>
               <CustomDatePicker
                 label="Date of Birth"
                 value={dateOfBirth}
                 maxYear={Number(todayDate.slice(0, 4))}
-                onChange={handleDateOfBirthChange}
+                onChange={handleDobChange}
               />
               <label className="field">
-                <span>Height in cm</span>
-                <input
-                  type="number"
-                  min="1"
-                  value={heightCm}
-                  onChange={(event) => setHeightCm(event.target.value)}
-                />
+                <span className="field-label-row">
+                  <span>Height</span>
+                  <span className="unit-toggle" aria-label="Height units">
+                    <button
+                      type="button"
+                      className={`unit-pill${heightUnit === 'cm' ? ' is-active' : ''}`}
+                      aria-pressed={heightUnit === 'cm'}
+                      onClick={() => toggleHeightUnit('cm')}
+                    >
+                      cm
+                    </button>
+                    <button
+                      type="button"
+                      className={`unit-pill${heightUnit === 'ftin' ? ' is-active' : ''}`}
+                      aria-pressed={heightUnit === 'ftin'}
+                      onClick={() => toggleHeightUnit('ftin')}
+                    >
+                      ft/in
+                    </button>
+                  </span>
+                </span>
+                {heightUnit === 'cm' ? (
+                  <input
+                    type="number"
+                    min="1"
+                    value={heightCm}
+                    onChange={(event) => setHeightCm(event.target.value)}
+                  />
+                ) : (
+                  <div className="unit-split-inputs">
+                    <input
+                      type="number"
+                      min="0"
+                      placeholder="ft"
+                      value={heightFt}
+                      onChange={handleFeetChange}
+                    />
+                    <input
+                      type="number"
+                      min="0"
+                      max="11"
+                      placeholder="in"
+                      value={heightIn}
+                      onChange={handleInchesChange}
+                    />
+                  </div>
+                )}
               </label>
               <label className="field">
-                <span>Weight in kg</span>
-                <input
-                  type="number"
-                  min="1"
-                  step="0.1"
-                  value={weightKg}
-                  onChange={(event) => setWeightKg(event.target.value)}
-                />
+                <span className="field-label-row">
+                  <span>Weight</span>
+                  <span className="unit-toggle" aria-label="Weight units">
+                    <button
+                      type="button"
+                      className={`unit-pill${weightUnit === 'kg' ? ' is-active' : ''}`}
+                      aria-pressed={weightUnit === 'kg'}
+                      onClick={() => toggleWeightUnit('kg')}
+                    >
+                      kg
+                    </button>
+                    <button
+                      type="button"
+                      className={`unit-pill${weightUnit === 'lbs' ? ' is-active' : ''}`}
+                      aria-pressed={weightUnit === 'lbs'}
+                      onClick={() => toggleWeightUnit('lbs')}
+                    >
+                      lbs
+                    </button>
+                  </span>
+                </span>
+                {weightUnit === 'kg' ? (
+                  <input
+                    type="number"
+                    min="1"
+                    step="0.1"
+                    value={weightKg}
+                    onChange={(event) => setWeightKg(event.target.value)}
+                  />
+                ) : (
+                  <input
+                    type="number"
+                    min="1"
+                    step="0.1"
+                    value={weightLbs}
+                    onChange={handleLbsChange}
+                  />
+                )}
               </label>
               <label className="field">
                 <span>Blood Group</span>

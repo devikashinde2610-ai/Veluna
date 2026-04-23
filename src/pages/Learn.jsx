@@ -164,7 +164,7 @@ function VideoSection({ title, videos, videosLoading }) {
   )
 }
 
-export default function Learn() {
+export default function Learn({ userId }) {
   const [age, setAge] = useState(null)
   const [videos, setVideos] = useState([])
   const [loading, setLoading] = useState(true)
@@ -183,21 +183,25 @@ export default function Learn() {
       setLoading(true)
       setError('')
 
-      const {
-        data: { user },
-        error: userError,
-      } = await supabase.auth.getUser()
+      const sessionResult = await supabase.auth.getSession()
+      const sessionUserId = sessionResult.data?.session?.user?.id ?? null
 
-      if (!active || userError || !user) {
-        setError(userError?.message || 'Could not load education content.')
-        setLoading(false)
+      // Fallback path: some environments briefly return no user on mount.
+      // We can still render the education page with default content.
+      const activeUserId = sessionUserId ?? userId ?? null
+
+      if (!activeUserId) {
+        if (active) {
+          setAge(18)
+          setLoading(false)
+        }
         return
       }
 
       const { data: profile, error: profileError } = await supabase
         .from('profiles')
         .select('age')
-        .eq('id', user.id)
+        .eq('id', activeUserId)
         .maybeSingle()
 
       if (!active) {
@@ -220,7 +224,7 @@ export default function Learn() {
     return () => {
       active = false
     }
-  }, [])
+  }, [userId])
 
   useEffect(() => {
     let active = true

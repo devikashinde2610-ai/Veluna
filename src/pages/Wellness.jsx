@@ -1,8 +1,8 @@
 import { useEffect, useId, useMemo, useRef, useState } from 'react'
 import { Heart, Music2, Pause, Play, RotateCcw, Square, Volume2, VolumeX } from 'lucide-react'
 import supabase from '../lib/supabase.js'
+import { DAY_IN_MS, diffInDays, getAverageCycleLength, normalizeDate } from '../utils/cycleUtils.js'
 
-const DAY_IN_MS = 1000 * 60 * 60 * 24
 const BREATHING_PATTERN = [
   { label: 'Inhale', seconds: 4 },
   { label: 'Hold', seconds: 4 },
@@ -662,23 +662,6 @@ const MENOPAUSE_MEDITATION_SESSION = {
   tracks: HORMONAL_BALANCE_TRACKS,
 }
 
-function normalizeDate(value) {
-  if (!value) {
-    return null
-  }
-
-  const date = new Date(value)
-  if (Number.isNaN(date.getTime())) {
-    return null
-  }
-
-  return new Date(date.getFullYear(), date.getMonth(), date.getDate())
-}
-
-function diffInDays(laterDate, earlierDate) {
-  return Math.round((laterDate - earlierDate) / DAY_IN_MS)
-}
-
 function formatDuration(totalSeconds) {
   const minutes = Math.floor(totalSeconds / 60)
   const seconds = totalSeconds % 60
@@ -704,16 +687,7 @@ function getCurrentPhase(cycleLogs) {
     return 'luteal'
   }
 
-  const averageCycleLength =
-    startDates.length > 1
-      ? Math.round(
-          startDates
-            .slice(0, -1)
-            .map((date, index) => diffInDays(date, startDates[index + 1]))
-            .reduce((total, value) => total + value, 0) /
-            (startDates.length - 1),
-        )
-      : 28
+  const averageCycleLength = getAverageCycleLength(cycleLogs, startDates)
 
   const latestStartDate = startDates[0]
   const today = new Date()

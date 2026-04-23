@@ -3,6 +3,7 @@ import { AlertTriangle, Circle, Droplets, Leaf, Pencil, Salad, Sparkles } from '
 import supabase, { GROQ_KEY } from '../lib/supabase.js'
 import { updateStreak } from '../lib/streak.js'
 import { formatDisplayDate, todayISO } from '../utils/dateUtils.js'
+import { diffInDays, getAverageCycleLength, normalizeDate } from '../utils/cycleUtils.js'
 
 const MOOD_OPTIONS = ['Energetic', 'Normal', 'Tired', 'Bloated', 'In Pain']
 const MEAL_SLOTS = ['Breakfast', 'Lunch', 'Dinner', 'Snack 1', 'Snack 2']
@@ -25,23 +26,6 @@ const FOOD_PREFERENCE_RULES = {
   Vegan: 'If Vegan: all meals must be plant based — no dairy, no eggs, no meat.',
 }
 
-function normalizeDate(value) {
-  if (!value) {
-    return null
-  }
-
-  const date = new Date(value)
-  if (Number.isNaN(date.getTime())) {
-    return null
-  }
-
-  return new Date(date.getFullYear(), date.getMonth(), date.getDate())
-}
-
-function diffInDays(laterDate, earlierDate) {
-  return Math.round((laterDate - earlierDate) / (1000 * 60 * 60 * 24))
-}
-
 function getCurrentPhase(cycleLogs) {
   const startDates = (cycleLogs ?? []).map((log) => normalizeDate(log.start_date)).filter(Boolean)
 
@@ -49,15 +33,7 @@ function getCurrentPhase(cycleLogs) {
     return 'luteal'
   }
 
-  const averageCycleLength =
-    startDates.length > 1
-      ? Math.round(
-          startDates
-            .slice(0, -1)
-            .map((date, index) => diffInDays(date, startDates[index + 1]))
-            .reduce((total, value) => total + value, 0) / (startDates.length - 1),
-        )
-      : 28
+  const averageCycleLength = getAverageCycleLength(cycleLogs, startDates)
 
   const latestStartDate = startDates[0]
   const today = normalizeDate(new Date())

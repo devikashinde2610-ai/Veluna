@@ -1,9 +1,8 @@
 import { useEffect, useMemo, useState } from 'react'
 import { HeartPulse, Lock } from 'lucide-react'
-import CustomDatePicker from '../components/CustomDatePicker.jsx'
 import supabase from '../lib/supabase.js'
 import { updateStreak } from '../lib/streak.js'
-import { formatDisplayDate, isValidDate, todayISO } from '../utils/dateUtils.js'
+import { formatDisplayDate, todayISO } from '../utils/dateUtils.js'
 
 const symptomOptions = [
   'Acne',
@@ -122,7 +121,6 @@ function dedupeLogsByDate(logs) {
 export default function Symptoms() {
   const [profileId, setProfileId] = useState(null)
   const [profileAge, setProfileAge] = useState(null)
-  const [selectedDate, setSelectedDate] = useState(todayISO())
   const [selectedSymptoms, setSelectedSymptoms] = useState([])
   const [severity, setSeverity] = useState(5)
   const [notes, setNotes] = useState('')
@@ -137,12 +135,7 @@ export default function Symptoms() {
   const [isEditing, setIsEditing] = useState(false)
 
   const todayDate = todayISO()
-  const isSelectedLogReadOnly = Boolean(activeLog) && activeLog.log_date !== todayDate
-  const showSummaryCard = Boolean(activeLog) && (!isEditing || isSelectedLogReadOnly)
-  const datesWithExistingEntries = useMemo(
-    () => new Set(pastLogs.map((log) => log.log_date).filter(Boolean)),
-    [pastLogs],
-  )
+  const showSummaryCard = Boolean(activeLog) && !isEditing
 
   useEffect(() => {
     let active = true
@@ -254,7 +247,7 @@ export default function Symptoms() {
   }, [profileId])
 
   useEffect(() => {
-    if (!profileId || !selectedDate) {
+    if (!profileId) {
       return
     }
 
@@ -265,7 +258,7 @@ export default function Symptoms() {
         .from('symptom_logs')
         .select('*')
         .eq('profile_id', profileId)
-        .eq('log_date', selectedDate)
+        .eq('log_date', todayDate)
         .order('created_at', { ascending: false })
         .limit(1)
         .maybeSingle()
@@ -275,7 +268,7 @@ export default function Symptoms() {
       }
 
       if (existingError) {
-        setError(existingError.message || 'Could not load the symptom entry for this date.')
+        setError(existingError.message || 'Could not load today\'s symptom entry.')
         return
       }
 
@@ -304,7 +297,7 @@ export default function Symptoms() {
     return () => {
       active = false
     }
-  }, [profileId, selectedDate])
+  }, [profileId, todayDate])
 
   const trendLogs = useMemo(() => pastLogs.slice(0, 10).reverse(), [pastLogs])
 
@@ -322,12 +315,8 @@ export default function Symptoms() {
     setTimeout(() => setMoodAnimating(null), 400)
   }
 
-  const handleSelectedDateChange = (nextValue) => {
-    setSelectedDate(nextValue && isValidDate(nextValue) ? nextValue : '')
-  }
-
   const beginEditing = () => {
-    if (!activeLog || activeLog.log_date !== todayDate) {
+    if (!activeLog) {
       return
     }
 
@@ -353,7 +342,7 @@ export default function Symptoms() {
 
     const payload = {
       profile_id: profileId,
-      log_date: selectedDate,
+      log_date: todayDate,
       symptoms: selectedSymptoms,
       severity,
       notes: notes.trim() || null,
@@ -409,39 +398,15 @@ export default function Symptoms() {
         </div>
       ) : null}
 
-      <section className="card symptoms-date-card">
-        <CustomDatePicker
-          label="Log for date"
-          value={selectedDate}
-          maxYear={Number(todayDate.slice(0, 4))}
-          onChange={handleSelectedDateChange}
-        />
-        {selectedDate !== todayDate && datesWithExistingEntries.has(selectedDate) ? (
-          <p className="entry-date-note">
-            <Lock size={14} />
-            Past entries cannot be edited once the day has passed.
-          </p>
-        ) : null}
-      </section>
-
       {showSummaryCard ? (
         <>
           <section className="card today-summary-card">
             <div className="today-summary-head">
               <div>
                 <p className="today-summary-date">{formatDisplayDate(activeLog.log_date)}</p>
-                <h2 className="today-summary-title">
-                  {activeLog.log_date === todayDate ? "Today's Symptom Log" : 'Symptom Log'}
-                </h2>
+                <h2 className="today-summary-title">Today&apos;s Symptom Log</h2>
               </div>
-              {isSelectedLogReadOnly ? (
-                <span className="today-summary-lock">
-                  <Lock size={14} />
-                  Past entries cannot be edited
-                </span>
-              ) : (
-                <span className="today-summary-check">Logged today</span>
-              )}
+              <span className="today-summary-check">Logged today</span>
             </div>
 
             <div className="today-summary-section">
@@ -475,16 +440,12 @@ export default function Symptoms() {
               <p className="today-summary-notes">No notes added for this symptom log.</p>
             )}
 
-            {activeLog.log_date === todayDate ? (
-              <button type="button" className="summary-edit-button" onClick={beginEditing}>
-                Edit Today&apos;s Entry
-              </button>
-            ) : null}
+            <button type="button" className="summary-edit-button" onClick={beginEditing}>
+              Edit Today&apos;s Entry
+            </button>
           </section>
 
-          {activeLog.log_date === todayDate ? (
-            <p className="entry-edit-note">Entries can only be edited on the same day they were created.</p>
-          ) : null}
+          <p className="entry-edit-note">This page saves today&apos;s symptoms automatically for today only.</p>
         </>
       ) : (
         <>

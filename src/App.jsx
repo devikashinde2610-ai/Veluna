@@ -2,7 +2,6 @@ import { useEffect, useState } from 'react'
 import {
   Activity,
   BookOpen,
-  Flame,
   Heart,
   HeartPulse,
   LayoutDashboard,
@@ -21,7 +20,6 @@ import {
 } from 'react-router-dom'
 import './App.css'
 import supabase from './lib/supabase.js'
-import { fetchStreak } from './lib/streak.js'
 import VoiceInput from './components/VoiceInput.jsx'
 import Dashboard from './pages/Dashboard.jsx'
 import Analysis from './pages/Analysis.jsx'
@@ -77,53 +75,6 @@ function truncateEmail(email, maxLength = 20) {
   return `${email.slice(0, Math.max(0, maxLength - 3))}...`
 }
 
-/* ─────── Confetti Milestone Popup ─────── */
-function ConfettiPopup({ milestone, onDismiss }) {
-  useEffect(() => {
-    const timer = setTimeout(onDismiss, 5000)
-    return () => clearTimeout(timer)
-  }, [onDismiss])
-
-  const milestoneMessages = {
-    3: { emoji: '🥉', title: 'Bronze Badge!', subtitle: '3 day streak – you\'re building a habit!' },
-    7: { emoji: '🥈', title: 'Silver Badge!', subtitle: '7 day streak – one whole week of dedication!' },
-    14: { emoji: '🌟', title: 'Two Weeks Strong!', subtitle: '14 day streak – incredible consistency!' },
-    30: { emoji: '🥇', title: 'Gold Badge!', subtitle: '30 day streak – you\'re unstoppable!' },
-  }
-
-  const msg = milestoneMessages[milestone] || { emoji: '🎉', title: 'Milestone!', subtitle: `${milestone} day streak!` }
-
-  return (
-    <div className="confetti-popup-backdrop" onClick={onDismiss}>
-      <div className="confetti-popup" onClick={(e) => e.stopPropagation()}>
-        {/* CSS confetti pieces */}
-        {Array.from({ length: 40 }).map((_, i) => (
-          <span
-            key={i}
-            className="confetti-piece"
-            style={{
-              '--confetti-x': `${Math.random() * 100}%`,
-              '--confetti-delay': `${Math.random() * 0.6}s`,
-              '--confetti-fall-duration': `${1.2 + Math.random() * 1.5}s`,
-              '--confetti-color': ['#e8607a', '#f4a5b8', '#FFD700', '#C0C0C0', '#CD7F32', '#9b5e8a', '#d4edda', '#fff9db'][Math.floor(Math.random() * 8)],
-              '--confetti-rotate': `${Math.random() * 360}deg`,
-            }}
-          ></span>
-        ))}
-        <div className="confetti-popup-content">
-          <span className="confetti-emoji">{msg.emoji}</span>
-          <h2 className="confetti-title">Congratulations!</h2>
-          <h3 className="confetti-subtitle">{msg.title}</h3>
-          <p className="confetti-message">{msg.subtitle}</p>
-          <button type="button" className="pill-button confetti-dismiss" onClick={onDismiss}>
-            Awesome!
-          </button>
-        </div>
-      </div>
-    </div>
-  )
-}
-
 function RouteTransition({ children }) {
   const location = useLocation()
   const [displayLocation, setDisplayLocation] = useState(location)
@@ -154,23 +105,6 @@ function Sidebar({ user, mobileOpen, onClose }) {
   const displayName = getUserInitials(user)
   const email = user?.email || ''
   const truncatedEmail = truncateEmail(email)
-  const [sidebarStreak, setSidebarStreak] = useState(null)
-
-  const loadSidebarStreak = async () => {
-    if (!user?.id) return
-    const data = await fetchStreak(user.id)
-    setSidebarStreak(data)
-  }
-
-  useEffect(() => {
-    loadSidebarStreak()
-  }, [user?.id])
-
-  useEffect(() => {
-    const handleStreakUpdate = () => loadSidebarStreak()
-    window.addEventListener('streakUpdated', handleStreakUpdate)
-    return () => window.removeEventListener('streakUpdated', handleStreakUpdate)
-  }, [user?.id])
 
   return (
     <>
@@ -194,14 +128,6 @@ function Sidebar({ user, mobileOpen, onClose }) {
             <span title={email}>{truncatedEmail}</span>
           </div>
         </div>
-
-        {/* Streak flame indicator */}
-        {sidebarStreak && sidebarStreak.current_streak > 0 ? (
-          <div className="sidebar-streak-indicator" title={`${sidebarStreak.current_streak} day streak`}>
-            <Flame size={16} strokeWidth={2} />
-            <span>{sidebarStreak.current_streak}</span>
-          </div>
-        ) : null}
 
         <div className="sidebar-profile-divider" aria-hidden="true"></div>
 
@@ -244,21 +170,11 @@ function Sidebar({ user, mobileOpen, onClose }) {
 
 function AppShell({ session }) {
   const [mobileOpen, setMobileOpen] = useState(false)
-  const [milestonePopup, setMilestonePopup] = useState(null)
   const location = useLocation()
 
   useEffect(() => {
     setMobileOpen(false)
   }, [location.pathname])
-
-  // Listen for streak milestone events
-  useEffect(() => {
-    const handleMilestone = (event) => {
-      setMilestonePopup(event.detail)
-    }
-    window.addEventListener('streakMilestone', handleMilestone)
-    return () => window.removeEventListener('streakMilestone', handleMilestone)
-  }, [])
 
   const user = session?.user ?? null
 
@@ -284,7 +200,7 @@ function AppShell({ session }) {
         <main className="app-layout-content">
           <RouteTransition>
             <Route path="/" element={<Dashboard userId={session.user.id} />} />
-            <Route path="/learn" element={<Learn />} />
+            <Route path="/learn" element={<Learn userId={session.user.id} />} />
             <Route path="/wellness" element={<Wellness />} />
           <Route path="/doctors" element={<Doctors />} />
             <Route path="/analysis" element={<Analysis />} />
@@ -297,14 +213,6 @@ function AppShell({ session }) {
           <VoiceInput />
         </main>
       </div>
-
-      {/* Confetti Milestone Popup */}
-      {milestonePopup ? (
-        <ConfettiPopup
-          milestone={milestonePopup}
-          onDismiss={() => setMilestonePopup(null)}
-        />
-      ) : null}
     </div>
   )
 }

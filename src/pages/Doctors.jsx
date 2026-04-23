@@ -1,9 +1,8 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
-import { MapPin, PhoneCall, Star, Video } from 'lucide-react'
+import { ChevronLeft, ChevronRight, MapPin, PhoneCall, Star, Video, X } from 'lucide-react'
 import { MapContainer, Marker, Popup, TileLayer } from 'react-leaflet'
 import L from 'leaflet'
 import 'leaflet/dist/leaflet.css'
-import CustomDatePicker from '../components/CustomDatePicker.jsx'
 import supabase from '../lib/supabase.js'
 import { formatDisplayDate, isValidDate, todayISO } from '../utils/dateUtils.js'
 
@@ -202,6 +201,85 @@ const VIDEO_DOCTORS = [
 
 const TIME_SLOTS = ['9AM', '10AM', '11AM', '2PM', '3PM', '4PM']
 
+// Blocked booking dates (YYYY-MM-DD). Add holidays here.
+const BOOKING_BLOCKED_DATES = new Set([])
+
+const WEEKDAY_LABELS = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat']
+
+function parseISODate(dateString) {
+  if (!dateString || !isValidDate(dateString)) return null
+  const [year, month, day] = dateString.split('-').map(Number)
+  return new Date(year, month - 1, day)
+}
+
+function toISODate(date) {
+  const yyyy = String(date.getFullYear())
+  const mm = String(date.getMonth() + 1).padStart(2, '0')
+  const dd = String(date.getDate()).padStart(2, '0')
+  return `${yyyy}-${mm}-${dd}`
+}
+
+function startOfDay(date) {
+  return new Date(date.getFullYear(), date.getMonth(), date.getDate())
+}
+
+function BookingCalendar({ monthStart, value, minDate, maxDate, blockedDates, onSelect }) {
+  const year = monthStart.getFullYear()
+  const monthIndex = monthStart.getMonth()
+  const daysInMonth = new Date(year, monthIndex + 1, 0).getDate()
+  const firstWeekday = new Date(year, monthIndex, 1).getDay()
+
+  const selectedISO = value && isValidDate(value) ? value : ''
+
+  const isDisabled = (dateObj) => {
+    const dayDate = startOfDay(dateObj)
+    if (dayDate < minDate || dayDate > maxDate) return true
+    if (dayDate.getDay() === 0) return true // Sundays blocked
+    const iso = toISODate(dayDate)
+    return blockedDates?.has(iso) ?? false
+  }
+
+  return (
+    <div className="booking-calendar" role="group" aria-label="Choose appointment date">
+      <div className="booking-calendar-grid booking-calendar-weekdays" aria-hidden="true">
+        {WEEKDAY_LABELS.map((label) => (
+          <div key={label} className="booking-calendar-weekday">{label}</div>
+        ))}
+      </div>
+
+      <div className="booking-calendar-grid">
+        {Array.from({ length: firstWeekday }).map((_, idx) => (
+          <div key={`blank-${idx}`} className="booking-calendar-blank"></div>
+        ))}
+
+        {Array.from({ length: daysInMonth }, (_, idx) => {
+          const day = idx + 1
+          const dateObj = new Date(year, monthIndex, day)
+          const iso = toISODate(dateObj)
+          const disabled = isDisabled(dateObj)
+          const selected = iso === selectedISO
+
+          return (
+            <button
+              key={iso}
+              type="button"
+              className={`booking-calendar-day${selected ? ' is-selected' : ''}${disabled ? ' is-disabled' : ''}`}
+              onClick={() => {
+                if (!disabled) onSelect(iso)
+              }}
+              disabled={disabled}
+              aria-pressed={selected}
+              aria-label={iso}
+            >
+              {day}
+            </button>
+          )
+        })}
+      </div>
+    </div>
+  )
+}
+
 export default function Doctors() {
   const todayDate = todayISO()
   const [userLocation, setUserLocation] = useState(null)
@@ -223,9 +301,22 @@ export default function Doctors() {
   const [videoStream, setVideoStream] = useState(null)
   const videoRef = useRef(null)
 
-  const handleAppointmentDateChange = (nextValue) => {
-    setAppointmentDate(nextValue && isValidDate(nextValue) ? nextValue : '')
-  }
+  const minBookingDate = useMemo(() => {
+    const base = parseISODate(todayDate) ?? new Date()
+    const tomorrow = new Date(base.getFullYear(), base.getMonth(), base.getDate() + 1)
+    return startOfDay(tomorrow)
+  }, [todayDate])
+
+  const maxBookingDate = useMemo(() => {
+    const base = parseISODate(todayDate) ?? new Date()
+    // End of next month.
+    return startOfDay(new Date(base.getFullYear(), base.getMonth() + 2, 0))
+  }, [todayDate])
+
+  const [bookingCalendarMonth, setBookingCalendarMonth] = useState(() => {
+    const base = new Date()
+    return new Date(base.getFullYear(), base.getMonth(), 1)
+  })
 
   useEffect(() => {
     let active = true
@@ -338,6 +429,8 @@ export default function Doctors() {
     setAppointmentDate('')
     setTimeSlot('')
     setReason('')
+    const base = parseISODate(todayDate) ?? new Date()
+    setBookingCalendarMonth(new Date(base.getFullYear(), base.getMonth(), 1))
   }
 
   const handleConfirmBooking = async () => {
@@ -649,58 +742,136 @@ export default function Doctors() {
       </section>
 
       {activeBooking ? (
-        <div className="wellness-overlay doctors-booking-overlay" role="dialog" aria-modal="true">
-          <div className="wellness-overlay-card doctors-booking-card">
-            <p className="card-label overlay-label">Book appointment</p>
-            <h2>{activeBooking.name}</h2>
-            <p className="muted">{activeBooking.address}</p>
+        <>
+          <div
+            className="booking-modal-backdrop"
+            onClick={() => setActiveBooking(null)}
+            aria-hidden="true"
+          ></div>
+          <div
+            className="booking-modal"
+            role="dialog"
+            aria-modal="true"
+            aria-label="Book appointment"
+            onClick={(event) => event.stopPropagation()}
+          >
+            <button
+              type="button"
+              className="booking-modal-close"
+              onClick={() => setActiveBooking(null)}
+              aria-label="Close booking modal"
+              disabled={bookingSaving}
+            >
+              <X size={18} strokeWidth={2.2} />
+            </button>
 
-            <div className="doctors-booking-form">
-              <CustomDatePicker
-                label="Date"
-                value={appointmentDate}
-                maxYear={Number(todayDate.slice(0, 4))}
-                onChange={handleAppointmentDateChange}
-              />
+            <div className="booking-modal-body">
+              <p className="card-label overlay-label">Book appointment</p>
+              <h2>{activeBooking.name}</h2>
+              <p className="muted">{activeBooking.address}</p>
 
-              <div className="field">
-                <span>Time</span>
-                <div className="pill-row booking-slot-row">
-                  {TIME_SLOTS.map((slot) => (
+              <div className="doctors-booking-form">
+                <div className="field">
+                  <span>Date</span>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginTop: 8, marginBottom: 8 }}>
                     <button
-                      key={slot}
                       type="button"
-                      className={`option-pill booking-slot-pill${timeSlot === slot ? ' selected' : ''}`}
-                      onClick={() => setTimeSlot(slot)}
+                      className="onboarding-secondary-button"
+                      onClick={() =>
+                        setBookingCalendarMonth(
+                          (current) => new Date(current.getFullYear(), current.getMonth() - 1, 1),
+                        )
+                      }
+                      disabled={
+                        new Date(bookingCalendarMonth.getFullYear(), bookingCalendarMonth.getMonth(), 1) <=
+                        new Date(minBookingDate.getFullYear(), minBookingDate.getMonth(), 1)
+                      }
+                      aria-label="Previous month"
                     >
-                      {slot}
+                      <ChevronLeft size={16} />
                     </button>
-                  ))}
+
+                    <div style={{ fontWeight: 700, color: 'var(--color-secondary)' }}>
+                      {new Intl.DateTimeFormat('en-US', { month: 'long', year: 'numeric' }).format(bookingCalendarMonth)}
+                    </div>
+
+                    <button
+                      type="button"
+                      className="onboarding-secondary-button"
+                      onClick={() =>
+                        setBookingCalendarMonth(
+                          (current) => new Date(current.getFullYear(), current.getMonth() + 1, 1),
+                        )
+                      }
+                      disabled={
+                        new Date(bookingCalendarMonth.getFullYear(), bookingCalendarMonth.getMonth(), 1) >=
+                        new Date(maxBookingDate.getFullYear(), maxBookingDate.getMonth(), 1)
+                      }
+                      aria-label="Next month"
+                    >
+                      <ChevronRight size={16} />
+                    </button>
+                  </div>
+
+                  <BookingCalendar
+                    monthStart={bookingCalendarMonth}
+                    value={appointmentDate}
+                    minDate={minBookingDate}
+                    maxDate={maxBookingDate}
+                    blockedDates={BOOKING_BLOCKED_DATES}
+                    onSelect={setAppointmentDate}
+                  />
+
+                  {appointmentDate ? (
+                    <p className="muted" style={{ marginTop: 8 }}>
+                      Selected: {formatDisplayDate(appointmentDate)}
+                    </p>
+                  ) : (
+                    <p className="muted" style={{ marginTop: 8 }}>
+                      Select an available date.
+                    </p>
+                  )}
                 </div>
+
+                <div className="field">
+                  <span>Time</span>
+                  <div className="pill-row booking-slot-row">
+                    {TIME_SLOTS.map((slot) => (
+                      <button
+                        key={slot}
+                        type="button"
+                        className={`option-pill booking-slot-pill${timeSlot === slot ? ' selected' : ''}`}
+                        onClick={() => setTimeSlot(slot)}
+                      >
+                        {slot}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+
+                <label className="field">
+                  <span>Patient name</span>
+                  <input
+                    type="text"
+                    value={patientName}
+                    onChange={(event) => setPatientName(event.target.value)}
+                    placeholder="Your full name"
+                  />
+                </label>
+
+                <label className="field">
+                  <span>Reason for visit</span>
+                  <textarea
+                    rows={3}
+                    value={reason}
+                    onChange={(event) => setReason(event.target.value)}
+                    placeholder="e.g. painful periods, irregular cycles, PCOS follow-up..."
+                  ></textarea>
+                </label>
               </div>
-
-              <label className="field">
-                <span>Patient name</span>
-                <input
-                  type="text"
-                  value={patientName}
-                  onChange={(event) => setPatientName(event.target.value)}
-                  placeholder="Your full name"
-                />
-              </label>
-
-              <label className="field">
-                <span>Reason for visit</span>
-                <textarea
-                  rows={3}
-                  value={reason}
-                  onChange={(event) => setReason(event.target.value)}
-                  placeholder="e.g. painful periods, irregular cycles, PCOS follow-up..."
-                ></textarea>
-              </label>
             </div>
 
-            <div className="wellness-overlay-actions">
+            <div className="booking-modal-actions">
               <button
                 type="button"
                 className="pill-button"
@@ -719,7 +890,7 @@ export default function Doctors() {
               </button>
             </div>
           </div>
-        </div>
+        </>
       ) : null}
 
       {videoDoctor ? (

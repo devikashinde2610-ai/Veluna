@@ -39,8 +39,10 @@ export default function CustomDatePicker({
   label,
   minYear = 1900,
   maxYear = new Date().getFullYear(),
+  maxDate = '',
 }) {
   const parsedValue = useMemo(() => parseValue(value), [value])
+  const parsedMaxDate = useMemo(() => parseValue(maxDate), [maxDate])
   const [year, setYear] = useState(parsedValue.year)
   const [month, setMonth] = useState(parsedValue.month)
   const [day, setDay] = useState(parsedValue.day)
@@ -63,20 +65,50 @@ export default function CustomDatePicker({
     return years
   }, [maxYear, minYear])
 
+  const monthOptions = useMemo(() => {
+    if (!year || !parsedMaxDate.year || year !== parsedMaxDate.year) {
+      return MONTH_OPTIONS
+    }
+
+    return MONTH_OPTIONS.filter((option) => Number(option.value) <= Number(parsedMaxDate.month))
+  }, [parsedMaxDate.month, parsedMaxDate.year, year])
+
   const dayOptions = useMemo(() => {
-    const totalDays = getDaysInMonth(year, month)
+    let totalDays = getDaysInMonth(year, month)
+
+    if (
+      year &&
+      month &&
+      parsedMaxDate.year &&
+      parsedMaxDate.month &&
+      year === parsedMaxDate.year &&
+      month === parsedMaxDate.month
+    ) {
+      totalDays = Math.min(totalDays, Number(parsedMaxDate.day))
+    }
+
     return Array.from({ length: totalDays }, (_, index) => ({
       value: String(index + 1).padStart(2, '0'),
       label: String(index + 1),
     }))
-  }, [month, year])
+  }, [month, parsedMaxDate.day, parsedMaxDate.month, parsedMaxDate.year, year])
 
   const emitChange = (nextYear, nextMonth, nextDay) => {
     if (nextYear && nextMonth && nextDay) {
-      onChange(`${nextYear}-${nextMonth}-${nextDay}`)
+      const dateStr = `${nextYear}-${nextMonth}-${nextDay}`
+
+      if (maxDate && dateStr > maxDate) {
+        console.log('[CustomDatePicker] Ignoring future date:', dateStr)
+        onChange('')
+        return
+      }
+
+      console.log('[CustomDatePicker] Date selected:', dateStr)
+      onChange(dateStr)
       return
     }
 
+    console.log('[CustomDatePicker] Clearing date')
     onChange('')
   }
 
@@ -129,7 +161,7 @@ export default function CustomDatePicker({
           <option value="" disabled>
             Month
           </option>
-          {MONTH_OPTIONS.map((option) => (
+          {monthOptions.map((option) => (
             <option key={option.value} value={option.value}>
               {option.label}
             </option>

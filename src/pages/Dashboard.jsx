@@ -1,11 +1,16 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
-import { ChevronLeft, ChevronRight, Droplets, Flame, Leaf, Moon, Sparkles, Sprout, SunMedium, X } from 'lucide-react'
-import CustomDatePicker from '../components/CustomDatePicker.jsx'
+import { Calendar, ChevronLeft, ChevronRight, Droplets, Flame, Leaf, Moon, Sparkles, Sprout, SunMedium, X } from 'lucide-react'
 import supabase from '../lib/supabase.js'
-import { fetchStreak, getStreakBadge } from '../lib/streak.js'
+import { getStreakBadge } from '../lib/streak.js'
 import { formatDisplayDate, isValidDate, todayISO } from '../utils/dateUtils.js'
+import { DAY_IN_MS, diffInDays, getAverageCycleLength, normalizeDate } from '../utils/cycleUtils.js'
 
-const DAY_IN_MS = 1000 * 60 * 60 * 24
+let dashboardDataCache = null
+
+function getCachedDashboardData(userId) {
+  return dashboardDataCache?.profileId === userId ? dashboardDataCache : null
+}
+
 const WEEKDAY_LABELS = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat']
 const PHASE_DEFINITIONS = [
   {
@@ -157,23 +162,6 @@ const MENOPAUSE_TIPS = [
   'Cutting back on caffeine late in the day may help with sleep problems and heart-racing sensations.',
 ]
 
-function normalizeDate(value) {
-  if (!value) {
-    return null
-  }
-
-  const date = new Date(value)
-  if (Number.isNaN(date.getTime())) {
-    return null
-  }
-
-  return new Date(date.getFullYear(), date.getMonth(), date.getDate())
-}
-
-function diffInDays(laterDate, earlierDate) {
-  return Math.round((laterDate - earlierDate) / DAY_IN_MS)
-}
-
 function getSymptomDate(entry) {
   return (
     entry.logged_at ||
@@ -225,93 +213,128 @@ function isFertileDay(cycleDay) {
   return cycleDay !== null && cycleDay >= 12 && cycleDay <= 16
 }
 
+function getMonthBounds(dateString) {
+  const [year, month] = dateString.split('-').map(Number)
+  const monthStart = new Date(year, month - 1, 1)
+  const nextMonthStart = new Date(year, month, 1)
+
+  return {
+    monthStart: `${String(monthStart.getFullYear())}-${String(monthStart.getMonth() + 1).padStart(2, '0')}-01`,
+    nextMonthStart: `${String(nextMonthStart.getFullYear())}-${String(nextMonthStart.getMonth() + 1).padStart(2, '0')}-01`,
+  }
+}
+
 export default function Dashboard({ userId }) {
+  const cachedDashboardData = getCachedDashboardData(userId)
   const todayDate = todayISO()
-  const [cycleLogs, setCycleLogs] = useState([])
-  const [healthReport, setHealthReport] = useState(null)
-  const [symptomLogs, setSymptomLogs] = useState([])
-  const [profileAge, setProfileAge] = useState(null)
+  const [cycleLogs, setCycleLogs] = useState(() => cachedDashboardData?.cycleLogs ?? [])
+  const [symptomLogs, setSymptomLogs] = useState(() => cachedDashboardData?.symptomLogs ?? [])
+  const [profileAge, setProfileAge] = useState(() => cachedDashboardData?.profileAge ?? null)
+  const [fullName, setFullName] = useState(() => cachedDashboardData?.fullName ?? null)
+  const [dashboardDataLoaded, setDashboardDataLoaded] = useState(() => Boolean(cachedDashboardData))
   const [calendarMonth, setCalendarMonth] = useState(() => {
     const now = new Date()
     return new Date(now.getFullYear(), now.getMonth(), 1)
   })
   const [selectedDay, setSelectedDay] = useState(null)
   const [phaseModalKey, setPhaseModalKey] = useState(null)
-  const [streakData, setStreakData] = useState(null)
+  const [streakData, setStreakData] = useState({
+    current_streak: 0,
+    longest_streak: 0,
+    total_days_logged: 0,
+  })
   const [periodModalOpen, setPeriodModalOpen] = useState(false)
   const [periodSaving, setPeriodSaving] = useState(false)
   const [periodError, setPeriodError] = useState('')
   const [existingPeriodLogId, setExistingPeriodLogId] = useState(null)
   const [periodForm, setPeriodForm] = useState({
     startDate: todayISO(),
-    endDate: '',
-    flowIntensity: '',
-    notes: '',
   })
+  const [showStartDateDropdown, setShowStartDateDropdown] = useState(false)
+  const [startPickerDay, setStartPickerDay] = useState('')
+  const [startPickerMonth, setStartPickerMonth] = useState('')
+  const [startPickerYear, setStartPickerYear] = useState('')
 
   const loadDashboardData = useCallback(async () => {
-    const [cycleResult, healthResult, symptomResult, profileResult] = await Promise.all([
-      supabase
-        .from('cycle_logs')
-        .select('*')
-        .eq('profile_id', userId)
-        .order('start_date', { ascending: false })
-        .limit(6),
-      supabase
-        .from('health_reports')
-        .select('*')
-        .eq('profile_id', userId)
-        .order('created_at', { ascending: false })
-        .limit(1)
-        .maybeSingle(),
-      supabase
-        .from('symptom_logs')
-        .select('*')
-        .eq('profile_id', userId)
-        .order('created_at', { ascending: false })
-        .limit(20),
-      supabase.from('profiles').select('age').eq('id', userId).maybeSingle(),
-    ])
+    try {
+      const {
+        data: { user: authenticatedUser },
+      } = await supabase.auth.getUser()
 
-    setCycleLogs(cycleResult.error ? [] : cycleResult.data ?? [])
-    setHealthReport(healthResult.error ? null : healthResult.data ?? null)
-    setSymptomLogs(symptomResult.error ? [] : symptomResult.data ?? [])
-    setProfileAge(profileResult.error ? null : Number(profileResult.data?.age) || null)
+      const activeUserId = authenticatedUser?.id ?? userId
+
+      // Fetch full_name from profiles
+      const profileResult = await supabase
+        .from('profiles')
+        .select('age, full_name')
+        .eq('id', activeUserId)
+        .maybeSingle()
+
+      const [cycleResult, symptomResult] = await Promise.all([
+        supabase
+          .from('cycle_logs')
+          .select('*')
+          .eq('profile_id', activeUserId)
+          .order('start_date', { ascending: false })
+          .limit(6),
+        supabase
+          .from('symptom_logs')
+          .select('*')
+          .eq('profile_id', activeUserId)
+          .order('created_at', { ascending: false })
+          .limit(20),
+      ])
+
+      const nextCycleLogs = cycleResult.error ? [] : cycleResult.data ?? []
+      const nextSymptomLogs = symptomResult.error ? [] : symptomResult.data ?? []
+      const nextProfileAge = profileResult.error ? null : Number(profileResult.data?.age) || null
+      const nextFullName = profileResult.error ? null : profileResult.data?.full_name || null
+
+      dashboardDataCache = {
+        profileId: activeUserId,
+        cycleLogs: nextCycleLogs,
+        symptomLogs: nextSymptomLogs,
+        profileAge: nextProfileAge,
+        fullName: nextFullName,
+      }
+
+      setCycleLogs(nextCycleLogs)
+      setSymptomLogs(nextSymptomLogs)
+      setProfileAge(nextProfileAge)
+      setFullName(nextFullName)
+    } finally {
+      setDashboardDataLoaded(true)
+    }
   }, [userId])
 
+  // Dedicated useEffect for streak fetching on mount (prevents navigation flicker).
   useEffect(() => {
-    let active = true
+    const fetchStreakOnMount = async () => {
+      try {
+        const {
+          data: { user },
+        } = await supabase.auth.getUser()
 
-    async function syncStreakData() {
-      const data = await fetchStreak(userId)
-      if (active) {
-        setStreakData(data)
+        if (!user) {
+          return
+        }
+
+        const { data, error } = await supabase
+          .from('streaks')
+          .select('*')
+          .eq('profile_id', user.id)
+          .single()
+
+        if (!error && data) {
+          setStreakData(data)
+        }
+      } catch {
+        // Intentionally ignore streak fetch errors and keep default state.
       }
     }
 
-    syncStreakData()
-
-    return () => {
-      active = false
-    }
-  }, [userId])
-
-  useEffect(() => {
-    let active = true
-
-    const handleStreakUpdate = async () => {
-      const data = await fetchStreak(userId)
-      if (active) {
-        setStreakData(data)
-      }
-    }
-
-    window.addEventListener('streakUpdated', handleStreakUpdate)
-    return () => {
-      active = false
-      window.removeEventListener('streakUpdated', handleStreakUpdate)
-    }
-  }, [userId])
+    fetchStreakOnMount()
+  }, [])
 
   useEffect(() => {
     if (typeof Notification !== 'undefined' && Notification.permission === 'default') {
@@ -327,39 +350,34 @@ export default function Dashboard({ userId }) {
 
   const cycleSummary = useMemo(() => {
     const startDates = cycleLogs.map((log) => normalizeDate(log.start_date)).filter(Boolean)
-
-    const averageCycleLength =
-      startDates.length > 1
-        ? Math.round(
-            startDates
-              .slice(0, -1)
-              .map((date, index) => diffInDays(date, startDates[index + 1]))
-              .reduce((total, value) => total + value, 0) /
-              (startDates.length - 1),
-          )
-        : 28
+    const avgCycleLength = getAverageCycleLength(cycleLogs, startDates)
 
     const latestStartDate = startDates[0] ?? null
-    const predictedNextPeriod = latestStartDate
-      ? new Date(latestStartDate.getTime() + averageCycleLength * DAY_IN_MS)
+    const predictedDate = latestStartDate
+      ? new Date(latestStartDate.getTime() + avgCycleLength * DAY_IN_MS)
       : null
 
     const today = new Date()
-    const normalizedToday = new Date(today.getFullYear(), today.getMonth(), today.getDate())
-    const daysUntilNextPeriod = predictedNextPeriod
-      ? Math.max(0, diffInDays(predictedNextPeriod, normalizedToday))
-      : null
-    const daysSinceLatestStart = latestStartDate ? diffInDays(normalizedToday, latestStartDate) : null
+    today.setHours(0, 0, 0, 0)
+
+    let daysUntil = null
+    if (predictedDate) {
+      const predicted = new Date(predictedDate)
+      predicted.setHours(0, 0, 0, 0)
+      daysUntil = Math.round((predicted - today) / (1000 * 60 * 60 * 24))
+    }
+
+    const daysSinceLatestStart = latestStartDate ? diffInDays(today, latestStartDate) : null
     const cycleDay =
-      latestStartDate && averageCycleLength > 0 && daysSinceLatestStart !== null
-        ? ((daysSinceLatestStart % averageCycleLength) + averageCycleLength) % averageCycleLength + 1
+      latestStartDate && avgCycleLength > 0 && daysSinceLatestStart !== null
+        ? ((daysSinceLatestStart % avgCycleLength) + avgCycleLength) % avgCycleLength + 1
         : null
 
     return {
-      averageCycleLength,
+      averageCycleLength: avgCycleLength,
       cycleDay,
-      predictedNextPeriod,
-      daysUntilNextPeriod,
+      predictedNextPeriod: predictedDate,
+      daysUntilNextPeriod: daysUntil,
       startDates,
       latestStartDate,
     }
@@ -372,14 +390,18 @@ export default function Dashboard({ userId }) {
       typeof Notification === 'undefined' ||
       Notification.permission !== 'granted' ||
       daysUntilNextPeriod === null ||
+      daysUntilNextPeriod < 0 ||
       daysUntilNextPeriod > 3
     ) {
       return
     }
 
-    const notification = new Notification(
-      `Your period is expected in ${daysUntilNextPeriod} days. Stay prepared and take care.`,
-    )
+    const notificationMessage =
+      daysUntilNextPeriod === 0
+        ? 'Your period is expected today. Stay prepared and take care.'
+        : `Your period is expected in ${daysUntilNextPeriod} days. Stay prepared and take care.`
+
+    const notification = new Notification(notificationMessage)
 
     return () => notification.close()
   }, [cycleSummary])
@@ -437,19 +459,31 @@ export default function Dashboard({ userId }) {
     })
   }, [cycleSummary, calendarMonth])
 
-  const healthScore =
-    healthReport && typeof healthReport.risk_score === 'number'
-      ? Math.max(0, Math.min(100, 100 - healthReport.risk_score))
-      : null
-
   const countdownToneClass =
-    cycleSummary.daysUntilNextPeriod === null
+    !dashboardDataLoaded
       ? 'tone-default'
-      : cycleSummary.daysUntilNextPeriod <= 3
-        ? 'tone-danger'
-        : cycleSummary.daysUntilNextPeriod <= 7
-          ? 'tone-warning'
-          : 'tone-default'
+      : cycleSummary.daysUntilNextPeriod === null
+        ? 'tone-default'
+        : cycleSummary.daysUntilNextPeriod < 0
+          ? 'tone-danger'
+          : cycleSummary.daysUntilNextPeriod === 0
+            ? 'tone-today'
+            : cycleSummary.daysUntilNextPeriod <= 3
+              ? 'tone-danger'
+              : cycleSummary.daysUntilNextPeriod <= 7
+                ? 'tone-warning'
+                : 'tone-default'
+
+  const countdownMessage =
+    !dashboardDataLoaded
+      ? ''
+      : cycleSummary.daysUntilNextPeriod === null
+        ? 'Log a cycle to predict'
+        : cycleSummary.daysUntilNextPeriod < 0
+          ? 'Update your last period date'
+          : cycleSummary.daysUntilNextPeriod === 0
+            ? 'Your period is expected today!'
+            : `${cycleSummary.daysUntilNextPeriod} day${cycleSummary.daysUntilNextPeriod === 1 ? '' : 's'}`
 
   const currentPhase = useMemo(() => {
     if (!cycleSummary.cycleDay) {
@@ -462,6 +496,105 @@ export default function Dashboard({ userId }) {
       ) ?? PHASE_DEFINITIONS[PHASE_DEFINITIONS.length - 1]
     )
   }, [cycleSummary.cycleDay])
+
+  const firstName = useMemo(() => {
+    const normalizedName = typeof fullName === 'string' ? fullName.trim() : ''
+    if (!normalizedName) {
+      return 'Friend'
+    }
+
+    return normalizedName.split(/\s+/)[0]
+  }, [fullName])
+
+  const greeting = useMemo(() => {
+    const hour = new Date().getHours()
+
+    if (hour >= 6 && hour < 12) {
+      return {
+        smallGreeting: 'good morning ✨',
+        largeGreeting: `hey ${firstName} 🌸`,
+        smallGreetingClass: 'small-caps-rose-pink',
+        largeGreetingClass: 'large-playfair-italic-plum',
+      }
+    }
+
+    if (hour >= 12 && hour < 17) {
+      return {
+        smallGreeting: 'hey girlie 💅',
+        largeGreeting: `what's up ${firstName}`,
+        smallGreetingClass: 'small-caps-rose-pink',
+        largeGreetingClass: 'large-playfair-italic-plum',
+      }
+    }
+
+    if (hour >= 17 && hour < 21) {
+      return {
+        smallGreeting: 'slay the evening 🌙',
+        largeGreeting: `hey ${firstName}`,
+        smallGreetingClass: 'small-caps-rose-pink',
+        largeGreetingClass: 'large-playfair-italic-plum',
+      }
+    }
+
+    return {
+      smallGreeting: 'night check-in 🌛',
+      largeGreeting: `hey ${firstName}`,
+      smallGreetingClass: 'small-caps-rose-pink',
+      largeGreetingClass: 'large-playfair-italic-plum',
+    }
+  }, [firstName])
+
+  const statusSubtitle = useMemo(() => {
+    if (!dashboardDataLoaded || !cycleSummary.cycleDay) {
+      return null
+    }
+
+    const daysUntil = cycleSummary.daysUntilNextPeriod
+
+    if (daysUntil !== null && daysUntil >= 1 && daysUntil <= 3) {
+      return {
+        text: 'your period is coming soon — stock up! 🩸',
+        tone: 'rose',
+      }
+    }
+
+    if (daysUntil !== null && daysUntil <= 0) {
+      return {
+        text: 'your period may have started — how are you feeling? 💗',
+        tone: 'rose',
+      }
+    }
+
+    if (currentPhase?.key === 'menstrual') {
+      return {
+        text: 'rest up, you deserve it 🫂',
+        tone: 'muted',
+      }
+    }
+
+    if (currentPhase?.key === 'follicular') {
+      return {
+        text: 'energy is rising — great time to start something new! 🌱',
+        tone: 'muted',
+      }
+    }
+
+    if (currentPhase?.key === 'ovulation') {
+      return {
+        text: 'you are glowing today ✨',
+        tone: 'muted',
+      }
+    }
+
+    if (currentPhase?.key === 'luteal') {
+      return {
+        text: 'be gentle with yourself today 🌙',
+        tone: 'muted',
+      }
+    }
+
+    return null
+  }, [currentPhase, cycleSummary.cycleDay, cycleSummary.daysUntilNextPeriod, dashboardDataLoaded])
 
   const menopauseLogs = useMemo(
     () =>
@@ -477,12 +610,24 @@ export default function Dashboard({ userId }) {
     return MENOPAUSE_TIPS[daySeed % MENOPAUSE_TIPS.length]
   }, [])
 
+  const isViewingCurrentMonth = useMemo(() => {
+    const now = new Date()
+    return (
+      calendarMonth.getFullYear() === now.getFullYear() &&
+      calendarMonth.getMonth() === now.getMonth()
+    )
+  }, [calendarMonth])
+
   function goToPrevMonth() {
     setCalendarMonth((prev) => new Date(prev.getFullYear(), prev.getMonth() - 1, 1))
     setSelectedDay(null)
   }
 
   function goToNextMonth() {
+    if (isViewingCurrentMonth) {
+      return
+    }
+
     setCalendarMonth((prev) => new Date(prev.getFullYear(), prev.getMonth() + 1, 1))
     setSelectedDay(null)
   }
@@ -507,24 +652,30 @@ export default function Dashboard({ userId }) {
     const today = todayISO()
     setPeriodError('')
     setPeriodModalOpen(true)
+    setShowStartDateDropdown(false)
+
+    const {
+      data: { user: authenticatedUser },
+    } = await supabase.auth.getUser()
+
+    const activeUserId = authenticatedUser?.id ?? userId
+    const { monthStart, nextMonthStart } = getMonthBounds(today)
 
     const { data, error: cycleError } = await supabase
       .from('cycle_logs')
       .select('*')
-      .eq('profile_id', userId)
-      .eq('start_date', today)
-      .order('created_at', { ascending: false })
+      .eq('profile_id', activeUserId)
+      .gte('start_date', monthStart)
+      .lt('start_date', nextMonthStart)
+      .order('start_date', { ascending: false })
       .limit(1)
       .maybeSingle()
 
     if (cycleError) {
-      setPeriodError(cycleError.message || 'Could not load today\'s period log.')
+      setPeriodError(cycleError.message || 'Could not load this month\'s period log.')
       setExistingPeriodLogId(null)
       setPeriodForm({
         startDate: today,
-        endDate: '',
-        flowIntensity: '',
-        notes: '',
       })
       return
     }
@@ -533,9 +684,6 @@ export default function Dashboard({ userId }) {
       setExistingPeriodLogId(data.id)
       setPeriodForm({
         startDate: data.start_date ?? today,
-        endDate: data.end_date ?? '',
-        flowIntensity: data.flow_intensity ?? '',
-        notes: data.notes ?? '',
       })
       return
     }
@@ -543,9 +691,6 @@ export default function Dashboard({ userId }) {
     setExistingPeriodLogId(null)
     setPeriodForm({
       startDate: today,
-      endDate: '',
-      flowIntensity: '',
-      notes: '',
     })
   }
 
@@ -553,19 +698,13 @@ export default function Dashboard({ userId }) {
     setPeriodModalOpen(false)
     setPeriodSaving(false)
     setPeriodError('')
-  }
-
-  const updatePeriodField = (key, value) => {
-    setPeriodForm((current) => ({
-      ...current,
-      [key]: value,
-    }))
+    setShowStartDateDropdown(false)
   }
 
   const updatePeriodDateField = (key, value) => {
     setPeriodForm((current) => ({
       ...current,
-      [key]: value && isValidDate(value) ? value : '',
+      [key]: value && isValidDate(value) && value <= todayDate ? value : '',
     }))
   }
 
@@ -574,16 +713,54 @@ export default function Dashboard({ userId }) {
     setPeriodSaving(true)
     setPeriodError('')
 
-    const payload = {
-      profile_id: userId,
-      start_date: periodForm.startDate,
-      end_date: periodForm.endDate || null,
-      flow_intensity: periodForm.flowIntensity || null,
-      notes: periodForm.notes.trim() || null,
+    const {
+      data: { user: authenticatedUser },
+    } = await supabase.auth.getUser()
+
+    const activeUserId = authenticatedUser?.id ?? userId
+    const selectedStartDate = periodForm.startDate
+
+    if (!selectedStartDate) {
+      setPeriodError('Please choose a period start date.')
+      setPeriodSaving(false)
+      return
     }
 
-    const response = existingPeriodLogId
-      ? await supabase.from('cycle_logs').update(payload).eq('id', existingPeriodLogId)
+    if (selectedStartDate > todayDate) {
+      setPeriodError('You can only log a period for today or a past date.')
+      setPeriodSaving(false)
+      return
+    }
+
+    const { monthStart, nextMonthStart } = getMonthBounds(selectedStartDate)
+
+    const { data: monthlyLogs, error: monthlyLogError } = await supabase
+      .from('cycle_logs')
+      .select('id, start_date')
+      .eq('profile_id', activeUserId)
+      .gte('start_date', monthStart)
+      .lt('start_date', nextMonthStart)
+
+    if (monthlyLogError) {
+      setPeriodError(monthlyLogError.message || 'Could not validate your monthly period log.')
+      setPeriodSaving(false)
+      return
+    }
+
+    const conflictingLog = (monthlyLogs ?? []).find((log) => log.id !== existingPeriodLogId)
+    const targetLogId = conflictingLog?.id ?? existingPeriodLogId
+
+    const payload = {
+      profile_id: activeUserId,
+      start_date: selectedStartDate,
+      end_date: null,
+      flow_intensity: null,
+      symptoms: [],
+      notes: null,
+    }
+
+    const response = targetLogId
+      ? await supabase.from('cycle_logs').update(payload).eq('id', targetLogId)
       : await supabase.from('cycle_logs').insert(payload)
 
     if (response.error) {
@@ -596,6 +773,92 @@ export default function Dashboard({ userId }) {
     closePeriodModal()
   }
 
+  const MONTH_NAMES = [
+    'January', 'February', 'March', 'April', 'May', 'June',
+    'July', 'August', 'September', 'October', 'November', 'December'
+  ]
+
+  function parseDateString(dateStr) {
+    if (!dateStr) return { year: '', month: '', day: '' }
+    const parts = dateStr.split('-')
+    return {
+      year: parts[0] || '',
+      month: parts[1] || '',
+      day: parts[2] || ''
+    }
+  }
+
+  function formatDateString(year, month, day) {
+    if (year && month && day) {
+      return `${year}-${month}-${day}`
+    }
+    return ''
+  }
+
+  function getDaysInMonth(year, month) {
+    if (!year || !month) return 31
+    return new Date(Number(year), Number(month), 0).getDate()
+  }
+
+  function getMonthName(monthNum) {
+    const index = Number(monthNum) - 1
+    return index >= 0 && index < 12 ? MONTH_NAMES[index] : ''
+  }
+
+  function openStartDatePicker() {
+    const parsed = parseDateString(periodForm.startDate)
+    setStartPickerDay(parsed.day)
+    setStartPickerMonth(parsed.month)
+    setStartPickerYear(parsed.year)
+    setShowStartDateDropdown(true)
+  }
+
+  const availableStartMonths = (() => {
+    if (!startPickerYear) {
+      return MONTH_NAMES.map((month, index) => ({
+        label: month,
+        value: String(index + 1).padStart(2, '0'),
+      }))
+    }
+
+    const selectedYear = Number(startPickerYear)
+    const currentYear = Number(todayDate.slice(0, 4))
+    const currentMonth = Number(todayDate.slice(5, 7))
+
+    return MONTH_NAMES.map((month, index) => ({
+      label: month,
+      value: String(index + 1).padStart(2, '0'),
+    })).filter((option) => selectedYear < currentYear || Number(option.value) <= currentMonth)
+  })()
+
+  const availableStartDays = (() => {
+    if (!startPickerYear || !startPickerMonth) {
+      return Array.from({ length: 31 }, (_, index) => String(index + 1).padStart(2, '0'))
+    }
+
+    const maxDaysInMonth = getDaysInMonth(startPickerYear, startPickerMonth)
+    const isCurrentMonth =
+      Number(startPickerYear) === Number(todayDate.slice(0, 4)) &&
+      Number(startPickerMonth) === Number(todayDate.slice(5, 7))
+    const maxDay = isCurrentMonth ? Number(todayDate.slice(8, 10)) : maxDaysInMonth
+
+    return Array.from({ length: maxDay }, (_, index) => String(index + 1).padStart(2, '0'))
+  })()
+
+  function confirmStartDate() {
+    if (startPickerDay && startPickerMonth && startPickerYear) {
+      const newDate = formatDateString(startPickerYear, startPickerMonth, startPickerDay)
+      if (newDate > todayDate) {
+        setPeriodError('You can only choose a date up to today.')
+        return
+      }
+
+      updatePeriodDateField('startDate', newDate)
+      setPeriodError('')
+      setShowStartDateDropdown(false)
+    }
+  }
+
   const calendarMonthLabel = new Intl.DateTimeFormat('en-US', {
     month: 'long',
     year: 'numeric',
@@ -605,8 +868,24 @@ export default function Dashboard({ userId }) {
     <div className="dashboard-page page-stack">
       <div className="page-header-row">
         <header className="section-title">
-          <p className="eyebrow">Welcome back</p>
-          <h1>Your Dashboard</h1>
+          <p className={`eyebrow ${greeting.smallGreetingClass}`}>
+            {greeting.smallGreeting}
+          </p>
+          <h1 className={greeting.largeGreetingClass}>
+            {greeting.largeGreeting}
+          </h1>
+          {statusSubtitle ? (
+            <p
+              style={{
+                margin: '10px 0 0',
+                fontSize: '0.9rem',
+                fontStyle: 'italic',
+                color: statusSubtitle.tone === 'rose' ? '#e8607a' : 'var(--color-muted)',
+              }}
+            >
+              {statusSubtitle.text}
+            </p>
+          ) : null}
         </header>
 
         {/* ───── Streak Card ───── */}
@@ -615,26 +894,20 @@ export default function Dashboard({ userId }) {
             <Flame size={28} strokeWidth={2} />
           </div>
           <div className="streak-card-info">
-            {streakData && streakData.current_streak > 0 ? (
-              <>
-                <span className="streak-card-number">{streakData.current_streak}</span>
-                <span className="streak-card-label">day streak</span>
-                {(() => {
-                  const badge = getStreakBadge(streakData.current_streak)
-                  if (!badge) return null
-                  return (
-                    <span
-                      className={`streak-badge streak-badge-${badge.tier}`}
-                      title={`${badge.label} badge`}
-                    >
-                      {badge.label}
-                    </span>
-                  )
-                })()}
-              </>
-            ) : (
-              <span className="streak-card-empty">Start your streak today!</span>
-            )}
+            <span className="streak-card-number">{streakData.current_streak ?? 0}</span>
+            <span className="streak-card-label">day streak</span>
+            {(() => {
+              const badge = getStreakBadge(streakData.current_streak ?? 0)
+              if (!badge) return null
+              return (
+                <span
+                  className={`streak-badge streak-badge-${badge.tier}`}
+                  title={`${badge.label} badge`}
+                >
+                  {badge.label}
+                </span>
+              )
+            })()}
           </div>
         </div>
       </div>
@@ -642,12 +915,14 @@ export default function Dashboard({ userId }) {
       <section className="card dashboard-hero">
         <p className="card-label card-label-light">Next Period In</p>
         <div className={`dashboard-countdown ${countdownToneClass}`}>
-          {cycleSummary.daysUntilNextPeriod === null
-            ? 'Log a cycle to predict'
-            : `${cycleSummary.daysUntilNextPeriod} day${cycleSummary.daysUntilNextPeriod === 1 ? '' : 's'}`}
+          {countdownMessage}
         </div>
         <p className="dashboard-predicted-date">
-          {cycleSummary.predictedNextPeriod ? formatDisplayDate(cycleSummary.predictedNextPeriod) : 'No predicted date yet'}
+          {!dashboardDataLoaded
+            ? ''
+            : cycleSummary.predictedNextPeriod
+              ? formatDisplayDate(cycleSummary.predictedNextPeriod)
+              : 'No predicted date yet'}
         </p>
       </section>
 
@@ -656,7 +931,13 @@ export default function Dashboard({ userId }) {
           <div className="card-head cycle-phase-head">
             <div>
               <p className="card-label">Cycle phase</p>
-              <h3>{currentPhase ? currentPhase.label : 'Phase unavailable'}</h3>
+              <h3>
+                {!dashboardDataLoaded
+                  ? ''
+                  : currentPhase
+                    ? currentPhase.label
+                    : 'Phase unavailable'}
+              </h3>
             </div>
             <div className="cycle-phase-icon" aria-hidden="true">
               {currentPhase ? <currentPhase.icon size={20} strokeWidth={2} /> : <Moon size={20} strokeWidth={2} />}
@@ -665,7 +946,9 @@ export default function Dashboard({ userId }) {
           <p className="cycle-phase-description">
             {currentPhase
               ? currentPhase.description
-              : 'Log more cycle data to see which phase you are in today.'}
+              : dashboardDataLoaded
+                ? 'Log more cycle data to see which phase you are in today.'
+                : ''}
           </p>
           <div className="phase-timeline" aria-label="Cycle phase timeline">
             {PHASE_DEFINITIONS.map((phase) => (
@@ -682,11 +965,19 @@ export default function Dashboard({ userId }) {
 
         <article className={`card today-tip-card${currentPhase ? ` phase-${currentPhase.tone}` : ''}`}>
           <p className="card-label">Today&apos;s tip</p>
-          <h3>{currentPhase ? `${currentPhase.label} support` : 'Cycle-aware support'}</h3>
+          <h3>
+            {!dashboardDataLoaded
+              ? ''
+              : currentPhase
+                ? `${currentPhase.label} support`
+                : 'Cycle-aware support'}
+          </h3>
           <p className="today-tip-copy">
             {currentPhase
               ? currentPhase.tip
-              : 'Once you log a cycle, daily guidance will adapt to your current phase automatically.'}
+              : dashboardDataLoaded
+                ? 'Once you log a cycle, daily guidance will adapt to your current phase automatically.'
+                : ''}
           </p>
         </article>
       </section>
@@ -771,6 +1062,7 @@ export default function Dashboard({ userId }) {
             className="premium-cal-nav-btn"
             onClick={goToNextMonth}
             aria-label="Next month"
+            disabled={isViewingCurrentMonth}
           >
             <ChevronRight size={20} />
           </button>
@@ -864,54 +1156,38 @@ export default function Dashboard({ userId }) {
         </div>
       </section>
 
-      <section className="card">
-        <p className="card-label">Health score</p>
-        <h3>How your latest report looks</h3>
-        <div className="health-score-panel">
-          {healthScore === null ? (
-            <p className="muted">No report yet - go to Analysis</p>
-          ) : (
-            <>
-              <strong>{healthScore}/100</strong>
-              <span className="muted">
-                Based on the newest health report and inverse risk score.
-              </span>
-            </>
-          )}
-        </div>
-      </section>
-
-      {/* ───── Streak History ───── */}
-      <section className="card streak-history-card">
-        <p className="card-label">Streak history</p>
-        <div className="streak-history-simple">
-          <span className="streak-history-flame-large" aria-hidden="true">
-            <Flame size={30} strokeWidth={2} />
-          </span>
-          {streakData && streakData.current_streak > 0 ? (
-            <>
-              <strong className="streak-history-number">{streakData.current_streak}</strong>
-              <span className="streak-history-day-label">day streak</span>
-              {(() => {
-                const badge = getStreakBadge(streakData.current_streak)
-                return badge ? (
-                  <span className={`streak-badge streak-badge-${badge.tier}`}>{badge.label}</span>
-                ) : null
-              })()}
-            </>
-          ) : (
-            <strong className="streak-history-empty">Start your streak today!</strong>
-          )}
-          <p className="streak-history-meta">
-            Longest: {streakData?.longest_streak ?? 0} days
-            <span aria-hidden="true"> • </span>
-            Total logged: {streakData?.total_days_logged ?? 0} days
-          </p>
-        </div>
-      </section>
+      {/* Log Period Button */}
+      <button
+        onClick={openPeriodModal}
+        style={{
+          width: '100%',
+          padding: '16px',
+          background: 'linear-gradient(135deg, #e8607a, #6b3a5e)',
+          color: 'white',
+          border: 'none',
+          borderRadius: '999px',
+          fontSize: '1rem',
+          fontWeight: '600',
+          fontFamily: 'DM Sans, sans-serif',
+          cursor: 'pointer',
+          letterSpacing: '0.04em',
+          boxShadow: '0 6px 24px rgba(232,96,122,0.35)',
+          marginTop: '1rem',
+          marginBottom: '1rem',
+          transition: 'transform 0.15s, box-shadow 0.15s'
+        }}
+      >
+        + Log Period
+      </button>
 
       {periodModalOpen ? (
-        <div className="phase-modal-backdrop" onClick={closePeriodModal}>
+        <div 
+          className="phase-modal-backdrop" 
+          onClick={() => {
+            setShowStartDateDropdown(false)
+            closePeriodModal()
+          }}
+        >
           <div
             className="quick-log-modal"
             onClick={(event) => event.stopPropagation()}
@@ -942,45 +1218,91 @@ export default function Dashboard({ userId }) {
 
             <form className="quick-log-form" onSubmit={handlePeriodSave}>
               <div className="custom-date-picker-stack">
-                <CustomDatePicker
-                  label="Period Start Date"
-                  value={periodForm.startDate}
-                  maxYear={Number(todayDate.slice(0, 4))}
-                  onChange={(value) => updatePeriodDateField('startDate', value)}
-                />
-                <CustomDatePicker
-                  label="Period End Date"
-                  value={periodForm.endDate}
-                  maxYear={Number(todayDate.slice(0, 4))}
-                  onChange={(value) => updatePeriodDateField('endDate', value)}
-                />
-              </div>
-
-              <div className="quick-log-section">
-                <p className="card-label">Flow intensity</p>
-                <div className="pill-row flow-pill-row">
-                  {['Light', 'Normal', 'Heavy', 'Very Heavy'].map((option) => (
-                    <button
-                      key={option}
-                      type="button"
-                      className={`option-pill${periodForm.flowIntensity === option ? ' selected' : ''}`}
-                      onClick={() => updatePeriodField('flowIntensity', option)}
-                    >
-                      {option}
-                    </button>
-                  ))}
+                {/* START DATE Calendar Card */}
+                <div className="calendar-card-date-picker">
+                  <button
+                    type="button"
+                    className="calendar-card"
+                    onClick={openStartDatePicker}
+                  >
+                    <div className="calendar-card-header"></div>
+                    {periodForm.startDate ? (
+                      <div className="calendar-card-content">
+                        <div className="calendar-card-date">
+                          <div className="calendar-card-day">
+                            {parseDateString(periodForm.startDate).day}
+                          </div>
+                          <div className="calendar-card-month-year">
+                            {getMonthName(parseDateString(periodForm.startDate).month)} {parseDateString(periodForm.startDate).year}
+                          </div>
+                        </div>
+                      </div>
+                    ) : (
+                      <div className="calendar-card-content">
+                        <div className="calendar-card-placeholder">
+                          <Calendar size={24} strokeWidth={1.5} />
+                          <div className="calendar-card-placeholder-text">Select</div>
+                        </div>
+                      </div>
+                    )}
+                  </button>
+                  {showStartDateDropdown && (
+                    <div className="calendar-card-dropdown">
+                      <div className="calendar-card-dropdown-row">
+                        <select
+                          className="calendar-card-select calendar-card-select-day"
+                          value={startPickerDay}
+                          onChange={(e) => setStartPickerDay(e.target.value)}
+                        >
+                          <option value="">Day</option>
+                          {availableStartDays.map((day) => (
+                            <option key={day} value={day}>{Number(day)}</option>
+                          ))}
+                        </select>
+                        <select
+                          className="calendar-card-select calendar-card-select-month"
+                          value={startPickerMonth}
+                          onChange={(e) => {
+                            setStartPickerMonth(e.target.value)
+                            setStartPickerDay('')
+                          }}
+                        >
+                          <option value="">Month</option>
+                          {availableStartMonths.map((month) => {
+                            const monthNum = month.value
+                            return <option key={monthNum} value={monthNum}>{month.label}</option>
+                          })}
+                        </select>
+                        <select
+                          className="calendar-card-select calendar-card-select-year"
+                          value={startPickerYear}
+                          onChange={(e) => {
+                            setStartPickerYear(e.target.value)
+                            setStartPickerMonth('')
+                            setStartPickerDay('')
+                          }}
+                        >
+                          <option value="">Year</option>
+                          {Array.from({ length: 150 }, (_, i) => {
+                            const year = String(new Date().getFullYear() - i)
+                            return <option key={year} value={year}>{year}</option>
+                          })}
+                        </select>
+                      </div>
+                      <button
+                        type="button"
+                        className="calendar-card-confirm-btn"
+                        onClick={confirmStartDate}
+                      >
+                        Confirm
+                      </button>
+                    </div>
+                  )}
                 </div>
               </div>
-
-              <label className="field full-width">
-                <span>Notes</span>
-                <textarea
-                  rows="4"
-                  value={periodForm.notes}
-                  onChange={(event) => updatePeriodField('notes', event.target.value)}
-                  placeholder="Anything you want to note about today."
-                />
-              </label>
+              <p className="muted">
+                Choose the day your period started. If this month already has a saved date, it will be updated.
+              </p>
 
               <button type="submit" className="pill-button submit-button" disabled={periodSaving}>
                 {periodSaving ? 'Saving...' : existingPeriodLogId ? 'Update' : 'Save'}

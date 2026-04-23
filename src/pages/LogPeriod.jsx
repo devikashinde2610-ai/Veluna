@@ -5,39 +5,29 @@ import supabase from '../lib/supabase.js'
 import { updateStreak } from '../lib/streak.js'
 import { formatDisplayDate, isValidDate, todayISO } from '../utils/dateUtils.js'
 
-const flowOptions = ['Light', 'Normal', 'Heavy', 'Very Heavy']
-const symptomOptions = [
-  'Acne',
-  'Cramps',
-  'Fatigue',
-  'Bloating',
-  'Mood Swings',
-  'Headache',
-  'Nausea',
-  'Hair Loss',
-  'Weight Gain',
-  'Breast Tenderness',
-  'Sleep Issues',
-  'Back Pain',
-]
+function getMonthBounds(dateString) {
+  const [year, month] = dateString.split('-').map(Number)
+  const monthStart = new Date(year, month - 1, 1)
+  const nextMonthStart = new Date(year, month, 1)
+
+  return {
+    monthStart: `${String(monthStart.getFullYear())}-${String(monthStart.getMonth() + 1).padStart(2, '0')}-01`,
+    nextMonthStart: `${String(nextMonthStart.getFullYear())}-${String(nextMonthStart.getMonth() + 1).padStart(2, '0')}-01`,
+  }
+}
 
 export default function LogPeriod() {
   const [profileId, setProfileId] = useState(null)
   const [startDate, setStartDate] = useState(todayISO())
-  const [endDate, setEndDate] = useState('')
-  const [flowIntensity, setFlowIntensity] = useState('')
-  const [selectedSymptoms, setSelectedSymptoms] = useState([])
-  const [notes, setNotes] = useState('')
   const [successMessage, setSuccessMessage] = useState('')
   const [errorMessage, setErrorMessage] = useState('')
   const [isSaving, setIsSaving] = useState(false)
   const [existingLogId, setExistingLogId] = useState(null)
-  const [todayLog, setTodayLog] = useState(null)
-  const [isEditingToday, setIsEditingToday] = useState(false)
+  const [currentMonthLog, setCurrentMonthLog] = useState(null)
+  const [isEditingCurrentMonth, setIsEditingCurrentMonth] = useState(false)
 
   const todayDate = todayISO()
-  const showSummaryCard = Boolean(todayLog) && !isEditingToday
-  const isTodayEntry = todayLog?.start_date === todayDate
+  const showSummaryCard = Boolean(currentMonthLog) && !isEditingCurrentMonth
 
   useEffect(() => {
     let active = true
@@ -69,13 +59,16 @@ export default function LogPeriod() {
 
     let active = true
 
-    async function loadTodayLog() {
+    async function loadCurrentMonthLog() {
+      const { monthStart, nextMonthStart } = getMonthBounds(todayDate)
+
       const { data, error } = await supabase
         .from('cycle_logs')
         .select('*')
         .eq('profile_id', profileId)
-        .eq('start_date', todayDate)
-        .order('created_at', { ascending: false })
+        .gte('start_date', monthStart)
+        .lt('start_date', nextMonthStart)
+        .order('start_date', { ascending: false })
         .limit(1)
         .maybeSingle()
 
@@ -84,81 +77,45 @@ export default function LogPeriod() {
       }
 
       if (error) {
-        setErrorMessage(error.message || "Could not load today's period entry.")
+        setErrorMessage(error.message || "Could not load this month's period entry.")
         return
       }
 
       if (data) {
         setExistingLogId(data.id)
-        setTodayLog(data)
+        setCurrentMonthLog(data)
         setStartDate(data.start_date ?? todayDate)
-        setEndDate(data.end_date ?? '')
-        setFlowIntensity(data.flow_intensity ?? '')
-        setSelectedSymptoms(Array.isArray(data.symptoms) ? data.symptoms : [])
-        setNotes(data.notes ?? '')
-        setIsEditingToday(false)
+        setIsEditingCurrentMonth(false)
         return
       }
 
       setExistingLogId(null)
-      setTodayLog(null)
+      setCurrentMonthLog(null)
       setStartDate(todayDate)
-      setEndDate('')
-      setFlowIntensity('')
-      setSelectedSymptoms([])
-      setNotes('')
-      setIsEditingToday(true)
+      setIsEditingCurrentMonth(true)
     }
 
-    loadTodayLog()
+    loadCurrentMonthLog()
 
     return () => {
       active = false
     }
   }, [profileId, todayDate])
 
-  useEffect(() => {
-    const handleVoiceInput = (event) => {
-      const transcript = event.detail?.trim()
-      if (!transcript) {
-        return
-      }
-
-      setNotes((current) => (current.trim() ? `${current.trim()} ${transcript}` : transcript))
-    }
-
-    window.addEventListener('voiceInput', handleVoiceInput)
-    return () => window.removeEventListener('voiceInput', handleVoiceInput)
-  }, [])
-
-  const toggleSymptom = (symptom) => {
-    setSelectedSymptoms((current) =>
-      current.includes(symptom)
-        ? current.filter((item) => item !== symptom)
-        : [...current, symptom],
-    )
-  }
-
   const beginEditing = () => {
-    if (!todayLog || !isTodayEntry) {
+    if (!currentMonthLog) {
       return
     }
 
-    setStartDate(todayLog.start_date ?? todayDate)
-    setEndDate(todayLog.end_date ?? '')
-    setFlowIntensity(todayLog.flow_intensity ?? '')
-    setSelectedSymptoms(Array.isArray(todayLog.symptoms) ? todayLog.symptoms : [])
-    setNotes(todayLog.notes ?? '')
-    setExistingLogId(todayLog.id ?? null)
-    setIsEditingToday(true)
+    setStartDate(currentMonthLog.start_date ?? todayDate)
+    setExistingLogId(currentMonthLog.id ?? null)
+    setIsEditingCurrentMonth(true)
+    setSuccessMessage('')
+    setErrorMessage('')
   }
 
   const handleStartDateChange = (nextValue) => {
-    setStartDate(nextValue && isValidDate(nextValue) ? nextValue : '')
-  }
-
-  const handleEndDateChange = (nextValue) => {
-    setEndDate(nextValue && isValidDate(nextValue) ? nextValue : '')
+    setStartDate(nextValue && isValidDate(nextValue) && nextValue <= todayDate ? nextValue : '')
   }
 
   const handleSubmit = async (event) => {
@@ -173,21 +130,51 @@ export default function LogPeriod() {
       return
     }
 
+    if (!startDate) {
+      setErrorMessage('Please choose your period start date.')
+      setIsSaving(false)
+      return
+    }
+
+    if (startDate > todayDate) {
+      setErrorMessage('You can only log a period for today or a past date.')
+      setIsSaving(false)
+      return
+    }
+
     try {
+      const { monthStart, nextMonthStart } = getMonthBounds(startDate)
+      const { data: monthlyLogs, error: monthlyLogError } = await supabase
+        .from('cycle_logs')
+        .select('id, start_date')
+        .eq('profile_id', profileId)
+        .gte('start_date', monthStart)
+        .lt('start_date', nextMonthStart)
+
+      if (monthlyLogError) {
+        setErrorMessage(monthlyLogError.message || 'Could not validate your monthly period log.')
+        setIsSaving(false)
+        return
+      }
+
+      const conflictingLog = (monthlyLogs ?? []).find((log) => log.id !== existingLogId)
+      const targetLogId = conflictingLog?.id ?? existingLogId
+
       const payload = {
         profile_id: profileId,
         start_date: startDate,
-        end_date: endDate || null,
-        flow_intensity: flowIntensity || null,
-        symptoms: selectedSymptoms,
-        notes: notes.trim() || null,
+        end_date: null,
+        flow_intensity: null,
+        symptoms: [],
+        notes: null,
       }
-      const response = existingLogId
-        ? await supabase.from('cycle_logs').update(payload).eq('id', existingLogId).select().single()
+
+      const response = targetLogId
+        ? await supabase.from('cycle_logs').update(payload).eq('id', targetLogId).select().single()
         : await supabase.from('cycle_logs').insert(payload).select().single()
 
       if (response.error) {
-        setErrorMessage(response.error.message)
+        setErrorMessage(response.error.message || 'Could not save your period log.')
         setIsSaving(false)
         return
       }
@@ -199,10 +186,19 @@ export default function LogPeriod() {
         }
         window.dispatchEvent(new CustomEvent('streakUpdated'))
 
-        setSuccessMessage(existingLogId ? 'Period entry updated successfully!' : 'Period logged successfully!')
-        setExistingLogId(response.data.id)
-        setTodayLog(response.data)
-        setIsEditingToday(false)
+        const savedMonthKey = response.data.start_date?.slice(0, 7)
+        const currentMonthKey = todayDate.slice(0, 7)
+
+        setSuccessMessage(targetLogId ? 'Period date updated successfully!' : 'Period date logged successfully!')
+
+        if (savedMonthKey === currentMonthKey) {
+          setExistingLogId(response.data.id)
+          setCurrentMonthLog(response.data)
+          setIsEditingCurrentMonth(false)
+        } else {
+          setExistingLogId(null)
+          setStartDate(todayDate)
+        }
       }
 
       setIsSaving(false)
@@ -243,119 +239,40 @@ export default function LogPeriod() {
           <section className="card today-summary-card">
             <div className="today-summary-head">
               <div>
-                <p className="today-summary-date">{formatDisplayDate(todayLog.start_date)}</p>
-                <h2 className="today-summary-title">
-                  {isTodayEntry ? "Today's Period Log" : 'Period Log'}
-                </h2>
+                <p className="today-summary-date">{formatDisplayDate(currentMonthLog.start_date)}</p>
+                <h2 className="today-summary-title">This Month&apos;s Period Log</h2>
               </div>
-              {isTodayEntry ? (
-                <span className="today-summary-check">Logged today</span>
-              ) : (
-                <span className="today-summary-lock">
-                  <Lock size={14} />
-                  Past entries cannot be edited
-                </span>
-              )}
-            </div>
-
-            <div className="today-summary-section">
-              <span className="status-pill neutral">
-                Flow: {todayLog.flow_intensity || 'Not specified'}
+              <span className="today-summary-lock">
+                <Lock size={14} />
+                One period log this month
               </span>
-              {todayLog.end_date ? (
-                <span className="status-pill neutral">Ends: {formatDisplayDate(todayLog.end_date)}</span>
-              ) : null}
             </div>
 
-            <div className="today-summary-pills">
-              {(Array.isArray(todayLog.symptoms) && todayLog.symptoms.length > 0
-                ? todayLog.symptoms
-                : ['No symptoms listed']).map((symptom) => (
-                <span key={symptom} className="today-summary-pill">
-                  {symptom}
-                </span>
-              ))}
-            </div>
+            <p className="today-summary-notes">
+              Your saved period start date can be updated anytime for this month.
+            </p>
 
-            {todayLog.notes ? (
-              <p className="today-summary-notes">{todayLog.notes}</p>
-            ) : (
-              <p className="today-summary-notes">No notes added for today&apos;s period log.</p>
-            )}
-
-            {isTodayEntry ? (
-              <button type="button" className="summary-edit-button" onClick={beginEditing}>
-                Edit Today&apos;s Entry
-              </button>
-            ) : null}
+            <button type="button" className="summary-edit-button" onClick={beginEditing}>
+              Update This Month&apos;s Date
+            </button>
           </section>
-
-          {isTodayEntry ? (
-            <p className="entry-edit-note">Entries can only be edited on the same day they were created.</p>
-          ) : null}
         </>
       ) : (
         <form className="card form-card log-form" onSubmit={handleSubmit}>
-          <div className="custom-date-picker-stack">
-            <CustomDatePicker
-              label="Period Start Date"
-              value={startDate}
-              maxYear={Number(todayDate.slice(0, 4))}
-              onChange={handleStartDateChange}
-            />
+          <CustomDatePicker
+            label="Period Start Date"
+            value={startDate}
+            maxYear={Number(todayDate.slice(0, 4))}
+            maxDate={todayDate}
+            onChange={handleStartDateChange}
+          />
 
-            <CustomDatePicker
-              label="Period End Date"
-              value={endDate}
-              maxYear={Number(todayDate.slice(0, 4))}
-              onChange={handleEndDateChange}
-            />
-          </div>
-
-          <section className="log-section">
-            <p className="card-label">Flow intensity</p>
-            <div className="pill-row flow-pill-row">
-              {flowOptions.map((option) => (
-                <button
-                  key={option}
-                  type="button"
-                  className={`option-pill${flowIntensity === option ? ' selected' : ''}`}
-                  onClick={() => setFlowIntensity(option)}
-                >
-                  {option}
-                </button>
-              ))}
-            </div>
-          </section>
-
-          <section className="log-section">
-            <p className="card-label">Symptoms</p>
-            <div className="pill-row">
-              {symptomOptions.map((symptom) => (
-                <button
-                  key={symptom}
-                  type="button"
-                  className={`option-pill${selectedSymptoms.includes(symptom) ? ' selected' : ''}`}
-                  onClick={() => toggleSymptom(symptom)}
-                >
-                  {symptom}
-                </button>
-              ))}
-            </div>
-          </section>
-
-          <label className="field full-width">
-            <span>Anything else you want to note?</span>
-            <textarea
-              rows="5"
-              value={notes}
-              onChange={(event) => setNotes(event.target.value)}
-              placeholder="Write anything about your energy, cravings, pain, or how today feels."
-            />
-          </label>
+          <p className="muted">
+            Choose the day your period started. If this month already has a saved date, saving will update it.
+          </p>
 
           <button type="submit" className="pill-button submit-button" disabled={isSaving}>
-            {isSaving ? 'Saving...' : existingLogId ? 'Update Entry' : 'Save Entry'}
+            {isSaving ? 'Saving...' : existingLogId ? 'Update Date' : 'Save Date'}
           </button>
         </form>
       )}

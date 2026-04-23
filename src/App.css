@@ -238,14 +238,14 @@ textarea {
   font-weight: 600;
   color: #fff;
   cursor: pointer;
-  background: linear-gradient(135deg, #e8607a 0%, #f08ea0 100%);
-  box-shadow: 0 14px 24px rgba(232, 96, 122, 0.22);
+  background: linear-gradient(135deg, #e8607a 0%, #6b3a5e 100%);
+  box-shadow: 0 8px 24px rgba(232, 96, 122, 0.25);
 }
 
 .pill-button:hover {
-  transform: translateY(-1px);
+  transform: translateY(-2px);
   box-shadow:
-    0 16px 30px rgba(232, 96, 122, 0.28),
+    0 12px 32px rgba(232, 96, 122, 0.3),
     0 0 0 4px rgba(232, 96, 122, 0.12);
 }
 
@@ -277,6 +277,14 @@ textarea {
   font-size: 0.94rem;
 }
 
+.field-note {
+  font-size: 0.75rem;
+  color: #9f9aa0;
+  font-style: italic;
+  font-weight: 400;
+  margin-top: -4px;
+}
+
 .custom-date-picker {
   width: 100%;
   min-width: 0;
@@ -285,66 +293,249 @@ textarea {
 .custom-date-picker-row {
   display: flex;
   align-items: center;
-  gap: 6px;
-  flex-wrap: wrap;
+  gap: 4px;
+  flex-wrap: nowrap;
   width: 100%;
 }
 
 .custom-date-select {
-  flex: 1 1 0;
-  width: auto;
-  min-width: 0;
-  padding: 12px 14px;
+  padding: 8px 12px;
   border: 1px solid #f2d9df;
-  border-radius: 18px;
-  background: #fff7f2;
+  border-radius: 999px;
+  background: #fdf0f2;
   color: var(--color-secondary);
   font: inherit;
-  font-size: 0.9rem;
+  font-size: 0.85rem;
   font-weight: 600;
   appearance: none;
   -webkit-appearance: none;
   overflow: visible;
   text-overflow: unset;
   white-space: nowrap;
+  cursor: pointer;
 }
 
 .custom-date-select:focus {
   outline: none;
   border-color: #e8607a;
-  box-shadow: 0 0 0 4px rgba(232, 96, 122, 0.12);
-  background: #fffafb;
+  box-shadow: 0 0 0 3px rgba(232, 96, 122, 0.15);
+  background: #fdf0f2;
 }
 
 .custom-date-select-day {
-  min-width: 65px;
-  max-width: 80px;
-  flex: 0.8 1 65px;
+  width: 60px;
+  flex: 0 0 60px;
 }
 
 .custom-date-select-month {
-  min-width: 100px;
-  flex: 1.5 1 100px;
+  width: 110px;
+  flex: 0 0 110px;
 }
 
 .custom-date-select-year {
-  min-width: 80px;
-  max-width: 100px;
-  flex: 1 1 80px;
+  width: 80px;
+  flex: 0 0 80px;
 }
 
 .custom-date-separator {
-  color: #9f9aa0;
+  color: #e8607a;
   font-weight: 700;
+  font-size: 0.85rem;
 }
 
 .custom-date-picker-stack {
   width: 100%;
-  overflow: hidden;
+  overflow: visible;
+  display: flex;
+  justify-content: center;
+  gap: 20px;
 }
 
 .custom-date-picker-stack .custom-date-picker + .custom-date-picker {
-  margin-top: 16px;
+  margin-top: 0;
+}
+
+.custom-date-picker-label {
+  display: block;
+  color: #e8607a;
+  font-size: 0.75rem;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  margin-bottom: 8px;
+}
+
+.calendar-card-date-picker {
+  position: relative;
+}
+
+.calendar-card {
+  width: 130px;
+  height: 130px;
+  background: white;
+  border-radius: 14px;
+  border: 1.5px solid rgba(232, 96, 122, 0.2);
+  box-shadow: 0 8px 24px rgba(232, 96, 122, 0.15);
+  overflow: hidden;
+  text-align: center;
+  cursor: pointer;
+  transition: transform 0.2s, box-shadow 0.2s;
+  user-select: none;
+  display: flex;
+  flex-direction: column;
+}
+
+.calendar-card:hover {
+  transform: translateY(-4px);
+  box-shadow: 0 12px 32px rgba(232, 96, 122, 0.2);
+}
+
+.calendar-card-header {
+  height: 8px;
+  background: linear-gradient(90deg, #e8607a, #e8a0b0);
+}
+
+.calendar-card-header.end-date {
+  background: linear-gradient(90deg, #6b3a5e, #9b5e8a);
+}
+
+.calendar-card-label {
+  display: none;
+}
+
+.calendar-card-label.end-date {
+  display: none;
+}
+
+.calendar-card-content {
+  padding: 6px 8px 8px;
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+}
+
+.calendar-card-placeholder {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  color: #9f9aa0;
+}
+
+.calendar-card-placeholder svg {
+  width: 24px;
+  height: 24px;
+  stroke-width: 1.5;
+}
+
+.calendar-card-placeholder-text {
+  font-size: 0.7rem;
+  font-weight: 500;
+}
+
+.calendar-card-date {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0px;
+}
+
+.calendar-card-day {
+  font-family: 'Playfair Display', serif;
+  font-size: 1.8rem;
+  font-style: italic;
+  font-weight: 700;
+  color: #e8607a;
+  line-height: 1;
+  letter-spacing: -0.02em;
+}
+
+.custom-date-picker-stack .calendar-card-date-picker:nth-child(2) .calendar-card-day {
+  color: #6b3a5e;
+}
+
+.calendar-card-month-year {
+  font-size: 0.65rem;
+  color: #9b5e8a;
+  font-weight: 400;
+}
+
+.calendar-card-dropdown {
+  position: absolute;
+  top: 100%;
+  left: 50%;
+  transform: translateX(-50%);
+  margin-top: 8px;
+  background: white;
+  border-radius: 12px;
+  border: 1px solid #f2d9df;
+  box-shadow: 0 8px 24px rgba(232, 96, 122, 0.15);
+  padding: 12px;
+  z-index: 10;
+  white-space: nowrap;
+}
+
+.calendar-card-dropdown-row {
+  display: flex;
+  gap: 6px;
+  justify-content: center;
+}
+
+.calendar-card-select {
+  padding: 8px 10px;
+  border: 1px solid #f2d9df;
+  border-radius: 8px;
+  background: #fdf0f2;
+  color: var(--color-secondary);
+  font-size: 0.85rem;
+  font-weight: 500;
+  cursor: pointer;
+  appearance: none;
+  -webkit-appearance: none;
+}
+
+.calendar-card-select:focus {
+  outline: none;
+  border-color: #e8607a;
+  box-shadow: 0 0 0 2px rgba(232, 96, 122, 0.1);
+}
+
+.calendar-card-select-day {
+  width: 50px;
+}
+
+.calendar-card-select-month {
+  width: 90px;
+}
+
+.calendar-card-select-year {
+  width: 65px;
+}
+
+.calendar-card-confirm-btn {
+  width: 100%;
+  margin-top: 8px;
+  padding: 8px 12px;
+  border: none;
+  border-radius: 8px;
+  background: linear-gradient(135deg, #e8607a, #e8a0b0);
+  color: white;
+  font-weight: 600;
+  font-size: 0.85rem;
+  cursor: pointer;
+  transition: box-shadow 0.2s, transform 0.2s;
+}
+
+.calendar-card-confirm-btn:hover {
+  box-shadow: 0 4px 12px rgba(232, 96, 122, 0.3);
+  transform: translateY(-1px);
+}
+
+.calendar-card-confirm-btn:active {
+  transform: translateY(0);
 }
 
 .full-width {
@@ -359,8 +550,8 @@ textarea {
 }
 
 .option-pill {
-  border: 1px solid #f2d9df;
-  background: #fff7f2;
+  border: 1.5px solid rgba(232, 96, 122, 0.3);
+  background: #fdf0f2;
   color: var(--color-secondary);
   border-radius: 999px;
   padding: 11px 16px;
@@ -370,10 +561,231 @@ textarea {
 }
 
 .option-pill.selected {
-  background: var(--color-primary);
-  border-color: var(--color-primary);
+  background: linear-gradient(135deg, #e8607a, #e8a0b0);
+  border-color: #e8607a;
   color: #fff;
-  box-shadow: 0 12px 24px rgba(232, 96, 122, 0.16);
+  box-shadow: 0 8px 20px rgba(232, 96, 122, 0.2);
+}
+
+/* ===== Unit Toggle Pills (Height/Weight) ===== */
+.field-label-row {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.unit-toggle {
+  display: inline-flex;
+  gap: 6px;
+}
+
+.unit-pill {
+  font-size: 0.75rem;
+  padding: 4px 10px;
+  border-radius: 999px;
+  border: 1px solid rgba(61, 26, 53, 0.18);
+  background: rgba(61, 26, 53, 0.06);
+  color: var(--color-muted);
+  cursor: pointer;
+  line-height: 1.1;
+}
+
+.unit-pill.is-active {
+  background: #e8607a;
+  border-color: #e8607a;
+  color: #fff;
+}
+
+.unit-split-inputs {
+  display: flex;
+  gap: 10px;
+}
+
+.unit-split-inputs input {
+  width: 100%;
+}
+
+/* ===== Booking Calendar (Doctors) ===== */
+.booking-calendar {
+  margin-top: 10px;
+  padding: 14px;
+  border-radius: 18px;
+  border: 1px solid rgba(232, 96, 122, 0.18);
+  background: rgba(255, 255, 255, 0.55);
+}
+
+.booking-calendar-head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 10px;
+}
+
+.booking-calendar-month {
+  font-weight: 700;
+  color: var(--color-secondary);
+}
+
+.booking-calendar-hint {
+  font-size: 0.8rem;
+  color: var(--color-muted);
+}
+
+.booking-calendar-grid {
+  display: grid;
+  grid-template-columns: repeat(7, minmax(0, 1fr));
+  gap: 8px;
+}
+
+.booking-calendar-weekdays {
+  margin-bottom: 8px;
+}
+
+.booking-calendar-weekday {
+  font-size: 0.72rem;
+  font-weight: 700;
+  color: var(--color-muted);
+  text-align: center;
+  letter-spacing: 0.04em;
+}
+
+.booking-calendar-blank {
+  height: 36px;
+}
+
+.booking-calendar-day {
+  height: 36px;
+  border-radius: 12px;
+  border: 1px solid rgba(232, 96, 122, 0.18);
+  background: rgba(255, 240, 243, 0.6);
+  color: var(--color-secondary);
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.booking-calendar-day:hover {
+  border-color: rgba(232, 96, 122, 0.45);
+  background: rgba(255, 240, 243, 0.9);
+}
+
+.booking-calendar-day.is-selected {
+  background: linear-gradient(135deg, #e8607a, #9b5e8a);
+  border-color: transparent;
+  color: #fff;
+}
+
+.booking-calendar-day.is-disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
+/* ===== Booking Modal (Doctors) ===== */
+.booking-modal-backdrop {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.5);
+  z-index: 9998;
+}
+
+.booking-modal {
+  position: fixed;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  z-index: 9999;
+  width: 90%;
+  max-width: 500px;
+  max-height: 90vh;
+  overflow: hidden;
+  background: #fff;
+  border-radius: 24px;
+  padding: 2rem;
+  box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+  display: flex;
+  flex-direction: column;
+}
+
+.booking-modal-close {
+  position: absolute;
+  top: 14px;
+  right: 14px;
+  width: 38px;
+  height: 38px;
+  border-radius: 999px;
+  border: 1px solid rgba(61, 26, 53, 0.12);
+  background: rgba(255, 255, 255, 0.9);
+  color: var(--color-secondary);
+  display: grid;
+  place-items: center;
+  cursor: pointer;
+}
+
+.booking-modal-actions {
+  flex-shrink: 0;
+  background: #fff;
+  padding-top: 1rem;
+  margin-top: 1rem;
+  display: flex;
+  gap: 12px;
+  border-top: 1px solid rgba(61, 26, 53, 0.08);
+}
+
+.booking-modal-actions .pill-button,
+.booking-modal-actions .onboarding-secondary-button {
+  flex: 1;
+}
+
+.booking-modal-body {
+  flex: 1;
+  overflow-y: auto;
+  -webkit-overflow-scrolling: touch;
+  overscroll-behavior: contain;
+  padding-right: 2px;
+}
+
+.flow-intensity-container {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  align-items: center;
+}
+
+.flow-intensity-label {
+  display: block;
+  font-size: 0.65rem;
+  font-weight: 700;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: #e8607a;
+}
+
+.flow-intensity-drops {
+  display: flex;
+  gap: 8px;
+  justify-content: center;
+}
+
+.flow-intensity-drop {
+  font-size: 2rem;
+  cursor: pointer;
+  transition: opacity 0.2s, transform 0.2s;
+  opacity: 0.25;
+}
+
+.flow-intensity-drop:hover {
+  transform: scale(1.15);
+}
+
+.flow-intensity-drop.active {
+  opacity: 1;
+}
+
+.flow-intensity-value {
+  font-size: 0.8rem;
+  color: #e8607a;
+  font-weight: 500;
+  height: 1.2rem;
 }
 
 .avatar {
@@ -3141,6 +3553,10 @@ textarea {
   color: #eb8c42;
 }
 
+.dashboard-countdown.tone-today {
+  color: #e8607a;
+}
+
 .dashboard-countdown.tone-danger {
   color: #d94b5f;
 }
@@ -5901,14 +6317,14 @@ textarea {
 }
 
 .quick-log-modal {
-  width: min(100%, 480px);
+  width: min(100%, 520px);
   border-radius: 28px;
   border: 1px solid rgba(232, 96, 122, 0.14);
   background:
     radial-gradient(circle at top right, rgba(232, 96, 122, 0.08), transparent 28%),
     linear-gradient(180deg, #fffdfd 0%, #fff6f8 100%);
   box-shadow: 0 30px 60px rgba(61, 26, 53, 0.24);
-  padding: 24px;
+  padding: 2rem;
 }
 
 .quick-log-modal-head {
@@ -5916,7 +6332,16 @@ textarea {
   align-items: flex-start;
   justify-content: space-between;
   gap: 16px;
-  margin-bottom: 18px;
+  margin-bottom: 24px;
+}
+
+.quick-log-modal-head h3 {
+  font-family: 'Playfair Display', serif;
+  font-style: italic;
+  color: #6b3a5e;
+  font-size: 1.6rem;
+  margin: 0;
+  line-height: 1.2;
 }
 
 .quick-log-form {
@@ -6124,6 +6549,99 @@ textarea {
     width: min(100%, 100vw - 24px);
     padding: 20px;
     border-radius: 24px;
+  }
+}
+
+/* ===== Greeting Customization ===== */
+.small-caps-rose-pink {
+  font-size: 0.8rem;
+  text-transform: uppercase;
+  font-variant: small-caps;
+  letter-spacing: 0.1em;
+  color: #e8607a;
+  font-weight: 500;
+}
+
+.large-playfair-italic-plum {
+  font-family: 'Playfair Display', serif;
+  font-size: 2rem;
+  font-style: italic;
+  color: #6b3a5e;
+  font-weight: 600;
+  line-height: 1.1;
+}
+
+/* ===== Status Pill ===== */
+.status-pill {
+  display: inline-block;
+  margin-top: 12px;
+  padding: 10px 16px;
+  border-radius: 999px;
+  font-size: 0.85rem;
+  font-weight: 500;
+  text-align: center;
+  max-width: 100%;
+  word-wrap: break-word;
+}
+
+.status-pill-soft-red {
+  background: #ffe8eb;
+  color: #c84a5f;
+}
+
+.status-pill-rose-pink {
+  background: #f7d0d8;
+  color: #a84a68;
+}
+
+.status-pill-pink {
+  background: #ffd6e0;
+  color: #c84a5f;
+}
+
+.status-pill-yellow {
+  background: #fff9db;
+  color: #b8920a;
+}
+
+.status-pill-green {
+  background: #d4edda;
+  color: #1e6e38;
+}
+
+.status-pill-lavender {
+  background: #e8e0f5;
+  color: #5a4a7a;
+}
+
+/* ===== Streak Loading Skeleton ===== */
+.streak-skeleton {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  min-width: 80px;
+}
+
+.skeleton-placeholder {
+  height: 24px;
+  width: 60px;
+  background: linear-gradient(
+    90deg,
+    rgba(232, 96, 122, 0.1) 0%,
+    rgba(232, 96, 122, 0.2) 50%,
+    rgba(232, 96, 122, 0.1) 100%
+  );
+  background-size: 200% 100%;
+  animation: skeleton-loading 1.5s infinite;
+  border-radius: 8px;
+}
+
+@keyframes skeleton-loading {
+  0% {
+    background-position: 200% 0;
+  }
+  100% {
+    background-position: -200% 0;
   }
 }
 
