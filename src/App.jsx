@@ -251,8 +251,6 @@ function App() {
     let mounted = true
     const timeout = setTimeout(() => {
       if (mounted) {
-        setSession(null)
-        setHasProfile(null)
         setProfileLoading(false)
         setAuthLoading(false)
       }
