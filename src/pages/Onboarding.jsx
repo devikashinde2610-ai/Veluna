@@ -261,6 +261,32 @@ export default function Onboarding({ onComplete }) {
   const [weightUnit, setWeightUnit] = useState('kg')
   const [weightLbs, setWeightLbs] = useState('')
 
+  // ── Date picker dropdown visibility ──────────────────────────────────────
+  const [showLastPeriodStartDropdown, setShowLastPeriodStartDropdown] = useState(false)
+  const [showLastPeriodEndDropdown, setShowLastPeriodEndDropdown] = useState(false)
+  const [showPreviousStartDropdown, setShowPreviousStartDropdown] = useState(false)
+  const [showPreviousEndDropdown, setShowPreviousEndDropdown] = useState(false)
+
+  // ── Last period start picker state ───────────────────────────────────────
+  const [lastStartPickerDay, setLastStartPickerDay] = useState('')
+  const [lastStartPickerMonth, setLastStartPickerMonth] = useState('')
+  const [lastStartPickerYear, setLastStartPickerYear] = useState('')
+
+  // ── Last period end picker state ─────────────────────────────────────────
+  const [lastEndPickerDay, setLastEndPickerDay] = useState('')
+  const [lastEndPickerMonth, setLastEndPickerMonth] = useState('')
+  const [lastEndPickerYear, setLastEndPickerYear] = useState('')
+
+  // ── Previous period start picker state ───────────────────────────────────
+  const [prevStartPickerDay, setPrevStartPickerDay] = useState('')
+  const [prevStartPickerMonth, setPrevStartPickerMonth] = useState('')
+  const [prevStartPickerYear, setPrevStartPickerYear] = useState('')
+
+  // ── Previous period end picker state ─────────────────────────────────────
+  const [prevEndPickerDay, setPrevEndPickerDay] = useState('')
+  const [prevEndPickerMonth, setPrevEndPickerMonth] = useState('')
+  const [prevEndPickerYear, setPrevEndPickerYear] = useState('')
+
   const [lastRangeMonth, setLastRangeMonth] = useState(() => {
     const base = parseISODate(todayDate) ?? new Date()
     return new Date(base.getFullYear(), base.getMonth(), 1)
@@ -273,42 +299,83 @@ export default function Onboarding({ onComplete }) {
   })
   const [prevActiveEdge, setPrevActiveEdge] = useState('start')
 
+  // ── Picker open/confirm helpers ───────────────────────────────────────────
+  const openLastPeriodStartPicker = () => {
+    setShowLastPeriodStartDropdown((prev) => !prev)
+    setShowLastPeriodEndDropdown(false)
+    setShowPreviousStartDropdown(false)
+    setShowPreviousEndDropdown(false)
+  }
+
+  const openLastPeriodEndPicker = () => {
+    setShowLastPeriodEndDropdown((prev) => !prev)
+    setShowLastPeriodStartDropdown(false)
+    setShowPreviousStartDropdown(false)
+    setShowPreviousEndDropdown(false)
+  }
+
+  const openPreviousStartPicker = () => {
+    setShowPreviousStartDropdown((prev) => !prev)
+    setShowLastPeriodStartDropdown(false)
+    setShowLastPeriodEndDropdown(false)
+    setShowPreviousEndDropdown(false)
+  }
+
+  const openPreviousEndPicker = () => {
+    setShowPreviousEndDropdown((prev) => !prev)
+    setShowLastPeriodStartDropdown(false)
+    setShowLastPeriodEndDropdown(false)
+    setShowPreviousStartDropdown(false)
+  }
+
+  const confirmLastPeriodStart = () => {
+    const dateStr = formatDateString(lastStartPickerYear, lastStartPickerMonth, lastStartPickerDay)
+    if (dateStr && isValidDate(dateStr)) {
+      setForm((current) => ({ ...current, lastPeriodStartDate: dateStr }))
+    }
+    setShowLastPeriodStartDropdown(false)
+  }
+
+  const confirmLastPeriodEnd = () => {
+    const dateStr = formatDateString(lastEndPickerYear, lastEndPickerMonth, lastEndPickerDay)
+    if (dateStr && isValidDate(dateStr)) {
+      setForm((current) => ({ ...current, lastPeriodEndDate: dateStr }))
+    }
+    setShowLastPeriodEndDropdown(false)
+  }
+
+  const confirmPreviousStart = () => {
+    const dateStr = formatDateString(prevStartPickerYear, prevStartPickerMonth, prevStartPickerDay)
+    if (dateStr && isValidDate(dateStr)) {
+      setForm((current) => ({ ...current, previousPeriodStartDate: dateStr }))
+    }
+    setShowPreviousStartDropdown(false)
+  }
+
+  const confirmPreviousEnd = () => {
+    const dateStr = formatDateString(prevEndPickerYear, prevEndPickerMonth, prevEndPickerDay)
+    if (dateStr && isValidDate(dateStr)) {
+      setForm((current) => ({ ...current, previousPeriodEndDate: dateStr }))
+    }
+    setShowPreviousEndDropdown(false)
+  }
+
   const bmi = useMemo(() => {
     const height = Number(form.heightCm)
     const weight = Number(form.weightKg)
-
-    if (!height || !weight) {
-      return null
-    }
-
+    if (!height || !weight) return null
     const meters = height / 100
     return weight / (meters * meters)
   }, [form.heightCm, form.weightKg])
 
   const progressWidth = `${((step + 1) / stepLabels.length) * 100}%`
 
-  const calculateAge = (dob) => {
-    if (!dob) return ''
-    const today = new Date()
-    const birthDate = new Date(dob)
-    let age = today.getFullYear() - birthDate.getFullYear()
-    const monthDiff = today.getMonth() - birthDate.getMonth()
-    if (monthDiff < 0 || (monthDiff === 0 && today.getDate() < birthDate.getDate())) {
-      age--
-    }
-    return age
-  }
-
   const updateField = (key) => (event) => {
-    setForm((current) => ({
-      ...current,
-      [key]: event.target.value,
-    }))
+    setForm((current) => ({ ...current, [key]: event.target.value }))
   }
 
   const toggleHeightUnit = (nextUnit) => {
     if (nextUnit === heightUnit) return
-
     if (nextUnit === 'ftin') {
       const converted = cmToFtIn(form.heightCm)
       setHeightFt(converted.ft)
@@ -316,106 +383,67 @@ export default function Onboarding({ onComplete }) {
       setHeightUnit('ftin')
       return
     }
-
-    // Switching to cm: convert current ft/in display to cm and store canonically.
     const cm = ftInToCm(heightFt, heightIn)
-    if (cm !== '') {
-      setForm((current) => ({ ...current, heightCm: cm }))
-    }
+    if (cm !== '') setForm((current) => ({ ...current, heightCm: cm }))
     setHeightUnit('cm')
   }
 
   const toggleWeightUnit = (nextUnit) => {
     if (nextUnit === weightUnit) return
-
     if (nextUnit === 'lbs') {
       setWeightLbs(kgToLbs(form.weightKg))
       setWeightUnit('lbs')
       return
     }
-
     const kg = lbsToKg(weightLbs)
-    if (kg !== '') {
-      setForm((current) => ({ ...current, weightKg: kg }))
-    }
+    if (kg !== '') setForm((current) => ({ ...current, weightKg: kg }))
     setWeightUnit('kg')
   }
 
   const handleFeetChange = (event) => {
     const nextFeet = event.target.value
     setHeightFt(nextFeet)
-    const cm = ftInToCm(nextFeet, heightIn)
-    setForm((current) => ({ ...current, heightCm: cm }))
+    setForm((current) => ({ ...current, heightCm: ftInToCm(nextFeet, heightIn) }))
   }
 
   const handleInchesChange = (event) => {
     const nextIn = event.target.value
     setHeightIn(nextIn)
-    const cm = ftInToCm(heightFt, nextIn)
-    setForm((current) => ({ ...current, heightCm: cm }))
+    setForm((current) => ({ ...current, heightCm: ftInToCm(heightFt, nextIn) }))
   }
 
   const handleLbsChange = (event) => {
     const nextLbs = event.target.value
     setWeightLbs(nextLbs)
-    const kg = lbsToKg(nextLbs)
-    setForm((current) => ({ ...current, weightKg: kg }))
-  }
-
-  const updateDateField = (key) => (nextValue) => {
-    const validValue = nextValue && isValidDate(nextValue) ? nextValue : ''
-    setForm((current) => {
-      const updated = {
-        ...current,
-        [key]: validValue,
-      }
-      return updated
-    })
+    setForm((current) => ({ ...current, weightKg: lbsToKg(nextLbs) }))
   }
 
   const handleDobChange = (dateValue) => {
-    console.log('[Onboarding Step 1] handleDobChange received:', dateValue)
     if (dateValue && isValidDate(dateValue)) {
       const today = new Date()
       const birth = new Date(dateValue)
       let age = today.getFullYear() - birth.getFullYear()
       const m = today.getMonth() - birth.getMonth()
       if (m < 0 || (m === 0 && today.getDate() < birth.getDate())) age--
-      console.log('[Onboarding Step 1] Calculated age:', age)
-      setForm((current) => ({
-        ...current,
-        dateOfBirth: dateValue,
-        age: age.toString(),
-      }))
+      setForm((current) => ({ ...current, dateOfBirth: dateValue, age: age.toString() }))
     } else {
-      console.log('[Onboarding Step 1] Invalid or empty date, clearing age')
-      setForm((current) => ({
-        ...current,
-        dateOfBirth: '',
-        age: '',
-      }))
+      setForm((current) => ({ ...current, dateOfBirth: '', age: '' }))
     }
   }
 
   const MONTH_NAMES = [
     'January', 'February', 'March', 'April', 'May', 'June',
-    'July', 'August', 'September', 'October', 'November', 'December'
+    'July', 'August', 'September', 'October', 'November', 'December',
   ]
 
   function parseDateString(dateStr) {
     if (!dateStr) return { year: '', month: '', day: '' }
     const parts = dateStr.split('-')
-    return {
-      year: parts[0] || '',
-      month: parts[1] || '',
-      day: parts[2] || ''
-    }
+    return { year: parts[0] || '', month: parts[1] || '', day: parts[2] || '' }
   }
 
   function formatDateString(year, month, day) {
-    if (year && month && day) {
-      return `${year}-${month}-${day}`
-    }
+    if (year && month && day) return `${year}-${month}-${day}`
     return ''
   }
 
@@ -429,17 +457,9 @@ export default function Onboarding({ onComplete }) {
     return intensities[level] || ''
   }
 
-  function textToIntensityLevel(text) {
-    const intensities = ['', 'Spotting', 'Light', 'Moderate', 'Heavy', 'Very Heavy']
-    return intensities.indexOf(text) || 0
-  }
-
   function handleIntensityChange(level) {
     setFlowIntensityLevel(level)
-    setForm((current) => ({
-      ...current,
-      flowIntensity: intensityLevelToText(level),
-    }))
+    setForm((current) => ({ ...current, flowIntensity: intensityLevelToText(level) }))
   }
 
   const goNext = () => {
@@ -485,10 +505,7 @@ export default function Onboarding({ onComplete }) {
       return
     }
 
-    const {
-      data: { user },
-      error: userError,
-    } = await supabase.auth.getUser()
+    const { data: { user }, error: userError } = await supabase.auth.getUser()
 
     if (userError || !user) {
       setError(userError?.message || 'Could not verify your account.')
@@ -571,9 +588,7 @@ export default function Onboarding({ onComplete }) {
 
         <section className="onboarding-progress-card">
           <div className="onboarding-progress-head">
-            <span>
-              Step {step + 1} of {stepLabels.length}
-            </span>
+            <span>Step {step + 1} of {stepLabels.length}</span>
             <strong>{stepLabels[step]}</strong>
           </div>
           <div className="onboarding-progress-track" aria-hidden="true">
@@ -590,26 +605,27 @@ export default function Onboarding({ onComplete }) {
         </section>
 
         {error ? (
-          <div className="status-card status-card-error" role="alert">
-            {error}
-          </div>
+          <div className="status-card status-card-error" role="alert">{error}</div>
         ) : null}
 
-        <form className="card onboarding-card" onSubmit={handleSubmit} onClick={(e) => {
-          if (!e.target.closest('.calendar-card-date-picker')) {
-            setShowLastPeriodStartDropdown(false)
-            setShowLastPeriodEndDropdown(false)
-            setShowPreviousStartDropdown(false)
-            setShowPreviousEndDropdown(false)
-          }
-        }}>
+        <form
+          className="card onboarding-card"
+          onSubmit={handleSubmit}
+          onClick={(e) => {
+            if (!e.target.closest('.calendar-card-date-picker')) {
+              setShowLastPeriodStartDropdown(false)
+              setShowLastPeriodEndDropdown(false)
+              setShowPreviousStartDropdown(false)
+              setShowPreviousEndDropdown(false)
+            }
+          }}
+        >
           {step === 0 ? (
             <div className="page-stack">
               <div>
                 <p className="card-label">Step 1</p>
                 <h2>Personal Details</h2>
               </div>
-
               <div className="field-grid">
                 <label className="field full-width">
                   <span>Full Name</span>
@@ -617,10 +633,10 @@ export default function Onboarding({ onComplete }) {
                 </label>
                 <label className="field">
                   <span>Age</span>
-                  <input 
-                    type="number" 
-                    min="1" 
-                    value={form.age} 
+                  <input
+                    type="number"
+                    min="1"
+                    value={form.age}
                     onChange={updateField('age')}
                     disabled={!!form.dateOfBirth}
                   />
@@ -639,9 +655,7 @@ export default function Onboarding({ onComplete }) {
                   <select value={form.bloodGroup} onChange={updateField('bloodGroup')}>
                     <option value="">Select blood group</option>
                     {bloodGroupOptions.map((option) => (
-                      <option key={option} value={option}>
-                        {option}
-                      </option>
+                      <option key={option} value={option}>{option}</option>
                     ))}
                   </select>
                 </label>
@@ -661,7 +675,6 @@ export default function Onboarding({ onComplete }) {
                   <strong>{bmi ? bmi.toFixed(1) : '--'}</strong>
                 </div>
               </div>
-
               <div className="field-grid">
                 <label className="field">
                   <span className="field-label-row">
@@ -672,17 +685,13 @@ export default function Onboarding({ onComplete }) {
                         className={`unit-pill${heightUnit === 'cm' ? ' is-active' : ''}`}
                         aria-pressed={heightUnit === 'cm'}
                         onClick={() => toggleHeightUnit('cm')}
-                      >
-                        cm
-                      </button>
+                      >cm</button>
                       <button
                         type="button"
                         className={`unit-pill${heightUnit === 'ftin' ? ' is-active' : ''}`}
                         aria-pressed={heightUnit === 'ftin'}
                         onClick={() => toggleHeightUnit('ftin')}
-                      >
-                        ft/in
-                      </button>
+                      >ft/in</button>
                     </span>
                   </span>
                   {heightUnit === 'cm' ? (
@@ -695,21 +704,8 @@ export default function Onboarding({ onComplete }) {
                     />
                   ) : (
                     <div className="unit-split-inputs">
-                      <input
-                        type="number"
-                        min="0"
-                        placeholder="ft"
-                        value={heightFt}
-                        onChange={handleFeetChange}
-                      />
-                      <input
-                        type="number"
-                        min="0"
-                        max="11"
-                        placeholder="in"
-                        value={heightIn}
-                        onChange={handleInchesChange}
-                      />
+                      <input type="number" min="0" placeholder="ft" value={heightFt} onChange={handleFeetChange} />
+                      <input type="number" min="0" max="11" placeholder="in" value={heightIn} onChange={handleInchesChange} />
                     </div>
                   )}
                 </label>
@@ -722,17 +718,13 @@ export default function Onboarding({ onComplete }) {
                         className={`unit-pill${weightUnit === 'kg' ? ' is-active' : ''}`}
                         aria-pressed={weightUnit === 'kg'}
                         onClick={() => toggleWeightUnit('kg')}
-                      >
-                        kg
-                      </button>
+                      >kg</button>
                       <button
                         type="button"
                         className={`unit-pill${weightUnit === 'lbs' ? ' is-active' : ''}`}
                         aria-pressed={weightUnit === 'lbs'}
                         onClick={() => toggleWeightUnit('lbs')}
-                      >
-                        lbs
-                      </button>
+                      >lbs</button>
                     </span>
                   </span>
                   {weightUnit === 'kg' ? (
@@ -764,12 +756,7 @@ export default function Onboarding({ onComplete }) {
                         type="button"
                         className={`option-pill${form.foodPreference === option ? ' selected' : ''}`}
                         aria-pressed={form.foodPreference === option}
-                        onClick={() =>
-                          setForm((current) => ({
-                            ...current,
-                            foodPreference: option,
-                          }))
-                        }
+                        onClick={() => setForm((current) => ({ ...current, foodPreference: option }))}
                       >
                         {option}
                       </button>
@@ -786,14 +773,10 @@ export default function Onboarding({ onComplete }) {
                 <p className="card-label">Step 3</p>
                 <h2>Medical Background</h2>
               </div>
-
               <div className="field-grid">
                 <label className="field">
                   <span>Family history of PCOS</span>
-                  <select
-                    value={form.familyHistoryPcos}
-                    onChange={updateField('familyHistoryPcos')}
-                  >
+                  <select value={form.familyHistoryPcos} onChange={updateField('familyHistoryPcos')}>
                     {familyHistoryOptions.map((option) => (
                       <option key={option} value={option}>
                         {option === 'not sure' ? 'Not sure' : option[0].toUpperCase() + option.slice(1)}
@@ -803,10 +786,7 @@ export default function Onboarding({ onComplete }) {
                 </label>
                 <label className="field">
                   <span>Family history of thyroid</span>
-                  <select
-                    value={form.familyHistoryThyroid}
-                    onChange={updateField('familyHistoryThyroid')}
-                  >
+                  <select value={form.familyHistoryThyroid} onChange={updateField('familyHistoryThyroid')}>
                     {familyHistoryOptions.map((option) => (
                       <option key={option} value={option}>
                         {option === 'not sure' ? 'Not sure' : option[0].toUpperCase() + option.slice(1)}
@@ -816,19 +796,11 @@ export default function Onboarding({ onComplete }) {
                 </label>
                 <label className="field full-width">
                   <span>Any known conditions</span>
-                  <textarea
-                    rows="3"
-                    value={form.medicalConditions}
-                    onChange={updateField('medicalConditions')}
-                  />
+                  <textarea rows="3" value={form.medicalConditions} onChange={updateField('medicalConditions')} />
                 </label>
                 <label className="field full-width">
                   <span>Current medications</span>
-                  <textarea
-                    rows="3"
-                    value={form.currentMedications}
-                    onChange={updateField('currentMedications')}
-                  />
+                  <textarea rows="3" value={form.currentMedications} onChange={updateField('currentMedications')} />
                 </label>
               </div>
             </div>
@@ -847,18 +819,12 @@ export default function Onboarding({ onComplete }) {
               <div className="custom-date-picker-stack">
                 {/* Last Period Start Date Card */}
                 <div className="calendar-card-date-picker">
-                  <button
-                    type="button"
-                    className="calendar-card"
-                    onClick={openLastPeriodStartPicker}
-                  >
+                  <button type="button" className="calendar-card" onClick={openLastPeriodStartPicker}>
                     <div className="calendar-card-header"></div>
                     {form.lastPeriodStartDate ? (
                       <div className="calendar-card-content">
                         <div className="calendar-card-date">
-                          <div className="calendar-card-day">
-                            {parseDateString(form.lastPeriodStartDate).day}
-                          </div>
+                          <div className="calendar-card-day">{parseDateString(form.lastPeriodStartDate).day}</div>
                           <div className="calendar-card-month-year">
                             {getMonthName(parseDateString(form.lastPeriodStartDate).month)} {parseDateString(form.lastPeriodStartDate).year}
                           </div>
@@ -876,33 +842,21 @@ export default function Onboarding({ onComplete }) {
                   {showLastPeriodStartDropdown && (
                     <div className="calendar-card-dropdown">
                       <div className="calendar-card-dropdown-row">
-                        <select
-                          className="calendar-card-select calendar-card-select-day"
-                          value={lastStartPickerDay}
-                          onChange={(e) => setLastStartPickerDay(e.target.value)}
-                        >
+                        <select className="calendar-card-select calendar-card-select-day" value={lastStartPickerDay} onChange={(e) => setLastStartPickerDay(e.target.value)}>
                           <option value="">Day</option>
                           {Array.from({ length: 31 }, (_, i) => {
                             const day = String(i + 1).padStart(2, '0')
                             return <option key={day} value={day}>{i + 1}</option>
                           })}
                         </select>
-                        <select
-                          className="calendar-card-select calendar-card-select-month"
-                          value={lastStartPickerMonth}
-                          onChange={(e) => setLastStartPickerMonth(e.target.value)}
-                        >
+                        <select className="calendar-card-select calendar-card-select-month" value={lastStartPickerMonth} onChange={(e) => setLastStartPickerMonth(e.target.value)}>
                           <option value="">Month</option>
                           {MONTH_NAMES.map((month, i) => {
                             const monthNum = String(i + 1).padStart(2, '0')
                             return <option key={monthNum} value={monthNum}>{month}</option>
                           })}
                         </select>
-                        <select
-                          className="calendar-card-select calendar-card-select-year"
-                          value={lastStartPickerYear}
-                          onChange={(e) => setLastStartPickerYear(e.target.value)}
-                        >
+                        <select className="calendar-card-select calendar-card-select-year" value={lastStartPickerYear} onChange={(e) => setLastStartPickerYear(e.target.value)}>
                           <option value="">Year</option>
                           {Array.from({ length: 150 }, (_, i) => {
                             const year = String(new Date().getFullYear() - i)
@@ -910,31 +864,19 @@ export default function Onboarding({ onComplete }) {
                           })}
                         </select>
                       </div>
-                      <button
-                        type="button"
-                        className="calendar-card-confirm-btn"
-                        onClick={confirmLastPeriodStart}
-                      >
-                        Confirm
-                      </button>
+                      <button type="button" className="calendar-card-confirm-btn" onClick={confirmLastPeriodStart}>Confirm</button>
                     </div>
                   )}
                 </div>
 
                 {/* Last Period End Date Card */}
                 <div className="calendar-card-date-picker">
-                  <button
-                    type="button"
-                    className="calendar-card"
-                    onClick={openLastPeriodEndPicker}
-                  >
+                  <button type="button" className="calendar-card" onClick={openLastPeriodEndPicker}>
                     <div className="calendar-card-header end-date"></div>
                     {form.lastPeriodEndDate ? (
                       <div className="calendar-card-content">
                         <div className="calendar-card-date">
-                          <div className="calendar-card-day">
-                            {parseDateString(form.lastPeriodEndDate).day}
-                          </div>
+                          <div className="calendar-card-day">{parseDateString(form.lastPeriodEndDate).day}</div>
                           <div className="calendar-card-month-year">
                             {getMonthName(parseDateString(form.lastPeriodEndDate).month)} {parseDateString(form.lastPeriodEndDate).year}
                           </div>
@@ -952,33 +894,21 @@ export default function Onboarding({ onComplete }) {
                   {showLastPeriodEndDropdown && (
                     <div className="calendar-card-dropdown">
                       <div className="calendar-card-dropdown-row">
-                        <select
-                          className="calendar-card-select calendar-card-select-day"
-                          value={lastEndPickerDay}
-                          onChange={(e) => setLastEndPickerDay(e.target.value)}
-                        >
+                        <select className="calendar-card-select calendar-card-select-day" value={lastEndPickerDay} onChange={(e) => setLastEndPickerDay(e.target.value)}>
                           <option value="">Day</option>
                           {Array.from({ length: 31 }, (_, i) => {
                             const day = String(i + 1).padStart(2, '0')
                             return <option key={day} value={day}>{i + 1}</option>
                           })}
                         </select>
-                        <select
-                          className="calendar-card-select calendar-card-select-month"
-                          value={lastEndPickerMonth}
-                          onChange={(e) => setLastEndPickerMonth(e.target.value)}
-                        >
+                        <select className="calendar-card-select calendar-card-select-month" value={lastEndPickerMonth} onChange={(e) => setLastEndPickerMonth(e.target.value)}>
                           <option value="">Month</option>
                           {MONTH_NAMES.map((month, i) => {
                             const monthNum = String(i + 1).padStart(2, '0')
                             return <option key={monthNum} value={monthNum}>{month}</option>
                           })}
                         </select>
-                        <select
-                          className="calendar-card-select calendar-card-select-year"
-                          value={lastEndPickerYear}
-                          onChange={(e) => setLastEndPickerYear(e.target.value)}
-                        >
+                        <select className="calendar-card-select calendar-card-select-year" value={lastEndPickerYear} onChange={(e) => setLastEndPickerYear(e.target.value)}>
                           <option value="">Year</option>
                           {Array.from({ length: 150 }, (_, i) => {
                             const year = String(new Date().getFullYear() - i)
@@ -986,13 +916,7 @@ export default function Onboarding({ onComplete }) {
                           })}
                         </select>
                       </div>
-                      <button
-                        type="button"
-                        className="calendar-card-confirm-btn"
-                        onClick={confirmLastPeriodEnd}
-                      >
-                        Confirm
-                      </button>
+                      <button type="button" className="calendar-card-confirm-btn" onClick={confirmLastPeriodEnd}>Confirm</button>
                     </div>
                   )}
                 </div>
@@ -1007,9 +931,7 @@ export default function Onboarding({ onComplete }) {
                       type="button"
                       className={`flow-intensity-drop${flowIntensityLevel >= i + 1 ? ' active' : ''}`}
                       onClick={() => handleIntensityChange(i + 1)}
-                    >
-                      🩸
-                    </button>
+                    >🩸</button>
                   ))}
                 </div>
                 <div className="flow-intensity-value">
@@ -1020,18 +942,12 @@ export default function Onboarding({ onComplete }) {
               <div className="custom-date-picker-stack">
                 {/* Previous Period Start Date Card */}
                 <div className="calendar-card-date-picker">
-                  <button
-                    type="button"
-                    className="calendar-card"
-                    onClick={openPreviousStartPicker}
-                  >
+                  <button type="button" className="calendar-card" onClick={openPreviousStartPicker}>
                     <div className="calendar-card-header"></div>
                     {form.previousPeriodStartDate ? (
                       <div className="calendar-card-content">
                         <div className="calendar-card-date">
-                          <div className="calendar-card-day">
-                            {parseDateString(form.previousPeriodStartDate).day}
-                          </div>
+                          <div className="calendar-card-day">{parseDateString(form.previousPeriodStartDate).day}</div>
                           <div className="calendar-card-month-year">
                             {getMonthName(parseDateString(form.previousPeriodStartDate).month)} {parseDateString(form.previousPeriodStartDate).year}
                           </div>
@@ -1049,33 +965,21 @@ export default function Onboarding({ onComplete }) {
                   {showPreviousStartDropdown && (
                     <div className="calendar-card-dropdown">
                       <div className="calendar-card-dropdown-row">
-                        <select
-                          className="calendar-card-select calendar-card-select-day"
-                          value={prevStartPickerDay}
-                          onChange={(e) => setPrevStartPickerDay(e.target.value)}
-                        >
+                        <select className="calendar-card-select calendar-card-select-day" value={prevStartPickerDay} onChange={(e) => setPrevStartPickerDay(e.target.value)}>
                           <option value="">Day</option>
                           {Array.from({ length: 31 }, (_, i) => {
                             const day = String(i + 1).padStart(2, '0')
                             return <option key={day} value={day}>{i + 1}</option>
                           })}
                         </select>
-                        <select
-                          className="calendar-card-select calendar-card-select-month"
-                          value={prevStartPickerMonth}
-                          onChange={(e) => setPrevStartPickerMonth(e.target.value)}
-                        >
+                        <select className="calendar-card-select calendar-card-select-month" value={prevStartPickerMonth} onChange={(e) => setPrevStartPickerMonth(e.target.value)}>
                           <option value="">Month</option>
                           {MONTH_NAMES.map((month, i) => {
                             const monthNum = String(i + 1).padStart(2, '0')
                             return <option key={monthNum} value={monthNum}>{month}</option>
                           })}
                         </select>
-                        <select
-                          className="calendar-card-select calendar-card-select-year"
-                          value={prevStartPickerYear}
-                          onChange={(e) => setPrevStartPickerYear(e.target.value)}
-                        >
+                        <select className="calendar-card-select calendar-card-select-year" value={prevStartPickerYear} onChange={(e) => setPrevStartPickerYear(e.target.value)}>
                           <option value="">Year</option>
                           {Array.from({ length: 150 }, (_, i) => {
                             const year = String(new Date().getFullYear() - i)
@@ -1083,31 +987,19 @@ export default function Onboarding({ onComplete }) {
                           })}
                         </select>
                       </div>
-                      <button
-                        type="button"
-                        className="calendar-card-confirm-btn"
-                        onClick={confirmPreviousStart}
-                      >
-                        Confirm
-                      </button>
+                      <button type="button" className="calendar-card-confirm-btn" onClick={confirmPreviousStart}>Confirm</button>
                     </div>
                   )}
                 </div>
 
                 {/* Previous Period End Date Card */}
                 <div className="calendar-card-date-picker">
-                  <button
-                    type="button"
-                    className="calendar-card"
-                    onClick={openPreviousEndPicker}
-                  >
+                  <button type="button" className="calendar-card" onClick={openPreviousEndPicker}>
                     <div className="calendar-card-header end-date"></div>
                     {form.previousPeriodEndDate ? (
                       <div className="calendar-card-content">
                         <div className="calendar-card-date">
-                          <div className="calendar-card-day">
-                            {parseDateString(form.previousPeriodEndDate).day}
-                          </div>
+                          <div className="calendar-card-day">{parseDateString(form.previousPeriodEndDate).day}</div>
                           <div className="calendar-card-month-year">
                             {getMonthName(parseDateString(form.previousPeriodEndDate).month)} {parseDateString(form.previousPeriodEndDate).year}
                           </div>
@@ -1125,33 +1017,21 @@ export default function Onboarding({ onComplete }) {
                   {showPreviousEndDropdown && (
                     <div className="calendar-card-dropdown">
                       <div className="calendar-card-dropdown-row">
-                        <select
-                          className="calendar-card-select calendar-card-select-day"
-                          value={prevEndPickerDay}
-                          onChange={(e) => setPrevEndPickerDay(e.target.value)}
-                        >
+                        <select className="calendar-card-select calendar-card-select-day" value={prevEndPickerDay} onChange={(e) => setPrevEndPickerDay(e.target.value)}>
                           <option value="">Day</option>
                           {Array.from({ length: 31 }, (_, i) => {
                             const day = String(i + 1).padStart(2, '0')
                             return <option key={day} value={day}>{i + 1}</option>
                           })}
                         </select>
-                        <select
-                          className="calendar-card-select calendar-card-select-month"
-                          value={prevEndPickerMonth}
-                          onChange={(e) => setPrevEndPickerMonth(e.target.value)}
-                        >
+                        <select className="calendar-card-select calendar-card-select-month" value={prevEndPickerMonth} onChange={(e) => setPrevEndPickerMonth(e.target.value)}>
                           <option value="">Month</option>
                           {MONTH_NAMES.map((month, i) => {
                             const monthNum = String(i + 1).padStart(2, '0')
                             return <option key={monthNum} value={monthNum}>{month}</option>
                           })}
                         </select>
-                        <select
-                          className="calendar-card-select calendar-card-select-year"
-                          value={prevEndPickerYear}
-                          onChange={(e) => setPrevEndPickerYear(e.target.value)}
-                        >
+                        <select className="calendar-card-select calendar-card-select-year" value={prevEndPickerYear} onChange={(e) => setPrevEndPickerYear(e.target.value)}>
                           <option value="">Year</option>
                           {Array.from({ length: 150 }, (_, i) => {
                             const year = String(new Date().getFullYear() - i)
@@ -1159,13 +1039,7 @@ export default function Onboarding({ onComplete }) {
                           })}
                         </select>
                       </div>
-                      <button
-                        type="button"
-                        className="calendar-card-confirm-btn"
-                        onClick={confirmPreviousEnd}
-                      >
-                        Confirm
-                      </button>
+                      <button type="button" className="calendar-card-confirm-btn" onClick={confirmPreviousEnd}>Confirm</button>
                     </div>
                   )}
                 </div>
@@ -1199,19 +1073,11 @@ export default function Onboarding({ onComplete }) {
             </button>
 
             {step < stepLabels.length - 1 ? (
-              <button
-                type="button"
-                className="pill-button onboarding-primary-button"
-                onClick={goNext}
-              >
+              <button type="button" className="pill-button onboarding-primary-button" onClick={goNext}>
                 Next
               </button>
             ) : (
-              <button
-                type="submit"
-                className="pill-button onboarding-primary-button"
-                disabled={saving}
-              >
+              <button type="submit" className="pill-button onboarding-primary-button" disabled={saving}>
                 {saving ? 'Saving...' : 'Submit'}
               </button>
             )}
